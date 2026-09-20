@@ -2963,6 +2963,7 @@ MonoBehaviour:
   aggroTime: 5
   honeyRange: 10
   honeyPrepareTime: 1.5
+  honeyLockTime: 0.5
   honeyDelay: 6
 --- !u!114 &210000021
 MonoBehaviour:
@@ -10594,10 +10595,14 @@ MonoBehaviour:
   boomerang: {fileID: 1136114172313347922}
   moveSpeed: 7
   sprintSpeed: 14
+  crouchSpeed: 2.5
   jumpForce: 9
+  crouchHeight: 1
   interactRange: 10
   throwForce: 10
   maxHealth: 100
+  turnSpeed: 160
+  quickThrowCharge: 0.45
 --- !u!54 &990776466
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -18640,11 +18645,13 @@ MonoBehaviour:
   playerTransform: {fileID: 990776470}
   lookAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   mouseSensitivity: 15
+  controllerSensitivity: 120
   distanceFromPlayer: 6.09
   playerHeight: 2
   shoulderDistance: 1.2
   shoulderSpeed: 8
-  controllerSensitivity: 120
+  followSpeed: 12
+  normalPitch: 12
 --- !u!1 &1862953931
 GameObject:
   m_ObjectHideFlags: 0
@@ -19000,7 +19007,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1880565746}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -19059,7 +19066,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
@@ -20931,6 +20938,10 @@ MonoBehaviour:
   damage: 20
   spinAxis: {x: 0, y: 1, z: 0}
   pathPoints: 40
+  precisionDamageMultiplier: 2
+  precisionCurveMultiplier: 0.35
+  ricochetDistance: 2
+  ricochetReturnTime: 0.7
   lockFlightSpeed: 25
 --- !u!1 &2214517497290825877
 GameObject:
