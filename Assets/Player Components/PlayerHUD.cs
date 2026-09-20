@@ -9,6 +9,8 @@ public class PlayerHUD : MonoBehaviour
     private WaveManager waveManager;
     private AcornWallet wallet;
     private PlayerPowerups powerups;
+    private float waveClearTimer;
+    private int clearedWave;
 
     private GUIStyle pickupStyle;
 
@@ -19,6 +21,21 @@ public class PlayerHUD : MonoBehaviour
         powerups = GetComponent<PlayerPowerups>();
         tree = FindAnyObjectByType<TreeObjective>();
         waveManager = FindAnyObjectByType<WaveManager>();
+
+        if (waveManager != null)
+            waveManager.WaveCleared += ShowWaveCleared;
+    }
+
+    void OnDestroy()
+    {
+        if (waveManager != null)
+            waveManager.WaveCleared -= ShowWaveCleared;
+    }
+
+    void Update()
+    {
+        if (waveClearTimer > 0f)
+            waveClearTimer -= Time.deltaTime;
     }
 
     void OnGUI()
@@ -41,10 +58,8 @@ public class PlayerHUD : MonoBehaviour
 
         DrawBar(new Vector2(20f, 20f), playerController.HealthPercent, Color.red, "Health");
         if (playerController.boomerang != null)
-        {
             DrawBar(new Vector2(20f, 50f), playerController.boomerang.ChargeAmount, Color.yellow, "Charge");
-            GUI.Label(new Rect(Screen.width - 300f, 20f, 290f, 30f), $"Curve: {playerController.boomerang.CurveAngle:0} degrees (scroll)");
-        }
+
         if (powerups != null)
         {
             if (powerups.CanSprint)
@@ -73,8 +88,17 @@ public class PlayerHUD : MonoBehaviour
         if (waveManager != null)
             GUI.Label(new Rect(20f, 110f, 250f, 30f), $"Wave {waveManager.CurrentWave}  Enemies {waveManager.EnemiesRemaining}");
 
+        if (waveClearTimer > 0f)
+            GUI.Label(new Rect(Screen.width * 0.5f - 100f, 50f, 200f, 30f), $"WAVE {clearedWave} CLEARED");
+
         if (!playerController.IsAlive || tree != null && !tree.IsAlive)
             GUI.Label(new Rect(Screen.width * 0.5f - 50f, 50f, 100f, 30f), "GAME OVER");
+    }
+
+    void ShowWaveCleared(int wave)
+    {
+        clearedWave = wave;
+        waveClearTimer = 2.5f;
     }
 
     void DrawDot()

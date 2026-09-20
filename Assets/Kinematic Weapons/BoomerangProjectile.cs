@@ -17,6 +17,10 @@ public class BoomerangProjectile : MonoBehaviour
     public float damage = 20f;
     public Vector3 spinAxis = Vector3.up;
     public int pathPoints = 40;
+    public float precisionDamageMultiplier = 2f;
+    public float precisionCurveMultiplier = 0.35f;
+    public float ricochetDistance = 2f;
+    public float ricochetReturnTime = 0.7f;
 
     public float ChargeAmount { get; private set; }
     public bool IsReady { get; private set; }
@@ -43,6 +47,11 @@ public class BoomerangProjectile : MonoBehaviour
     private int targetIndex;
     private bool lockFlight;
     private float lockFlightTimer;
+    private bool precisionFlight;
+    private bool precisionReturning;
+    private Vector3 precisionReturnStart;
+    private Vector3 precisionRicochetPoint;
+    private float precisionReturnProgress;
 
     public void AdjustCurve(float amount)
     {
@@ -99,6 +108,12 @@ public class BoomerangProjectile : MonoBehaviour
             return;
         }
 
+        if (precisionReturning)
+        {
+            FlyPrecisionReturn();
+            return;
+        }
+
         if (lockFlight)
         {
             FlyToTargets();
@@ -108,12 +123,31 @@ public class BoomerangProjectile : MonoBehaviour
 
         float progress = Mathf.Clamp01(flightProgress);
         Vector3 targetPosition = returnPoint != null ? returnPoint.position : startPosition;
-        Vector3 nextPosition = GetFlightPosition(progress, startPosition, launchDirection, ChargeAmount, targetPosition);
+        Vector3 nextPosition = GetFlightPosition(progress, startPosition, launchDirection, ChargeAmount, targetPosition, precisionFlight);
 
         Vector3 movement = nextPosition - rb.position;
 
         if (movement.sqrMagnitude > 0f && FindHit(movement, out RaycastHit hit))
         {
+            if (precisionFlight)
+            {
+                Enemy precisionEnemy = hit.collider.GetComponentInParent<Enemy>();
+                if (precisionEnemy != null)
+                {
+                    float precisionDamage = damage * Mathf.Lerp(1f, precisionDamageMultiplier, ChargeAmount);
+                    precisionEnemy.TakeDamage(precisionDamage);
+                }
+                else
+                {
+                    Defence precisionDefence = hit.collider.GetComponentInParent<Defence>();
+                    if (precisionDefence != null)
+                        precisionDefence.TakeDamage(damage);
+                }
+
+                BeginPrecisionReturn(hit, movement);
+                return;
+            }
+
             Enemy enemy = hit.collider.GetComponentInParent<Enemy>();
 
             if (enemy != null)
@@ -207,7 +241,23 @@ public class BoomerangProjectile : MonoBehaviour
         for (int i = 0; i < pointCount; i++)
         {
             float progress = (float)i / (pointCount - 1);
-            Vector3 point = GetFlightPosition(progress, pathStart, normalizedDirection, ChargeAmount, pathStart);
+            Vector3 point = GetFlightPosition(progress, pathStart, normalizedDirection, ChargeAmount, pathStart, false);
+            lineRenderer.SetPosition(i, point);
+        }
+    }
+
+    public void ShowPrecisionPath(Vector3 pathStart, Vector3 direction)
+    {
+        int pointCount = Mathf.Max(2, pathPoints);
+        Vector3 normalizedDirection = direction.normalized;
+
+        lineRenderer.positionCount = pointCount;
+        lineRenderer.enabled = true;
+
+        for (int i = 0; i < pointCount; i++)
+        {
+            float progress = (float)i / (pointCount - 1);
+            Vector3 point = GetFlightPosition(progress, pathStart, normalizedDirection, ChargeAmount, pathStart, true);
             lineRenderer.SetPosition(i, point);
         }
     }
@@ -245,6 +295,8 @@ public class BoomerangProjectile : MonoBehaviour
         targetIndex = 0;
         lockFlight = flightTargets.Count > 0;
         lockFlightTimer = 0f;
+        precisionFlight = false;
+        precisionReturning = false;
 
         HidePath();
         SetVisible(true);
@@ -260,7 +312,20 @@ public class BoomerangProjectile : MonoBehaviour
         }
     }
 
-    Vector3 GetFlightPosition(float progress, Vector3 origin, Vector3 direction, float chargeAmount, Vector3 targetPosition)
+    public void LaunchPrecision(Vector3 direction, float chargeAmount)
+    {
+        Launch(direction, chargeAmount, null);
+
+        if (!isFlying)
+            return;
+
+        precisionFlight = true;
+        precisionReturning = false;
+        lockFlight = false;
+        flightTargets.Clear();
+    }
+
+    Vector3 GetFlightPosition(float progress, Vector3 origin, Vector3 direction, float chargeAmount, Vector3 targetPosition, bool precision)
     {
         float distance = Mathf.Lerp(minimumDistance, maximumDistance, chargeAmount);
         float outwardDistance = Mathf.Sin(progress * Mathf.PI);
@@ -276,7 +341,10 @@ public class BoomerangProjectile : MonoBehaviour
         Vector3 position = origin;
         position += direction * distance * outwardDistance;
         position += arcDirection * arcHeight * outwardDistance;
-        position += sideDirection * curveAmount * sidewaysDistance;
+        float currentCurve = precision
+            ? Mathf.Lerp(curveAmount, curveAmount * precisionCurveMultiplier, chargeAmount)
+            : curveAmount;
+        position += sideDirection * currentCurve * sidewaysDistance;
 
         if (progress > 0.5f)
         {
@@ -290,6 +358,9 @@ public class BoomerangProjectile : MonoBehaviour
     void OnCollisionEnter(Collision collision)
     {
         if (!isFlying)
+            return;
+
+        if (precisionFlight)
             return;
 
         Enemy enemy = collision.collider.GetComponentInParent<Enemy>();
@@ -340,6 +411,8 @@ public class BoomerangProjectile : MonoBehaviour
 
     void FinishFlight()
     {
+        precisionFlight = false;
+        precisionReturning = false;
         lockFlight = false;
         flightTargets.Clear();
         isFlying = false;
@@ -353,6 +426,37 @@ public class BoomerangProjectile : MonoBehaviour
 
         if (returnPoint != null)
             rb.position = returnPoint.position;
+    }
+
+    void BeginPrecisionReturn(RaycastHit hit, Vector3 movement)
+    {
+        precisionReturning = true;
+        precisionReturnProgress = 0f;
+        precisionReturnStart = hit.point;
+
+        Vector3 normal = hit.normal.sqrMagnitude > 0f ? hit.normal.normalized : -movement.normalized;
+        Vector3 reflectedDirection = Vector3.Reflect(movement.normalized, normal);
+        precisionRicochetPoint = precisionReturnStart + reflectedDirection * ricochetDistance;
+
+        rb.MovePosition(precisionReturnStart);
+    }
+
+    void FlyPrecisionReturn()
+    {
+        precisionReturnProgress += Time.fixedDeltaTime / Mathf.Max(0.01f, ricochetReturnTime);
+        float progress = Mathf.Clamp01(precisionReturnProgress);
+        Vector3 target = returnPoint != null ? returnPoint.position : startPosition;
+        Vector3 first = Vector3.Lerp(precisionReturnStart, precisionRicochetPoint, progress);
+        Vector3 second = Vector3.Lerp(precisionRicochetPoint, target, progress);
+        Vector3 nextPosition = Vector3.Lerp(first, second, progress);
+
+        rb.MovePosition(nextPosition);
+
+        Vector3 axis = spinAxis.sqrMagnitude > 0f ? spinAxis.normalized : Vector3.up;
+        rb.MoveRotation(rb.rotation * Quaternion.AngleAxis(spinSpeed * Time.fixedDeltaTime, axis));
+
+        if (precisionReturnProgress >= 1f)
+            FinishFlight();
     }
 
     private void FlyToTargets()

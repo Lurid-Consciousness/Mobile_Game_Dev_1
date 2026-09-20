@@ -108,7 +108,7 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
             sprintTargetImage.color = new Color(0.96f, 0.72f, 0.2f, 0.72f);
         }
 
-        statusText.text = movementStick ? "TAP: JUMP   HOLD: CROUCH" : "HOLD: CHARGE";
+        statusText.text = movementStick ? "DRAG: MOVE   HOLD: CROUCH" : "HOLD: CHARGE";
         SendValueToControl(Vector2.zero);
     }
 
@@ -247,7 +247,7 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
         statusText.fontSize = 19;
         statusText.alignment = TextAnchor.MiddleCenter;
         statusText.color = Color.white;
-        statusText.text = movementStick ? "TAP: JUMP   HOLD: CROUCH" : "HOLD: CHARGE";
+        statusText.text = movementStick ? "DRAG: MOVE   HOLD: CROUCH" : "HOLD: CHARGE";
 
         if (movementStick)
         {

@@ -172,7 +172,6 @@ public class GameFlowController : MonoBehaviour
 
         AddSettingSlider(menu.transform, "Look sensitivity", "LookSensitivity", 0.2f, 3f, 1f, 225f);
         AddSettingSlider(menu.transform, "Field of view", "FieldOfView", 50f, 100f, 60f, 125f);
-        AddSettingSlider(menu.transform, "Curve angle per scroll", "CurveStep", 5f, 45f, 15f, 25f);
         AddSettingButton(menu.transform, "Invert Y", "InvertY", -100f, 0);
         AddSettingButton(menu.transform, "VSync", "VSync", -190f, 1);
         AddSettingButton(menu.transform, "Fullscreen", "Fullscreen", -280f, 1);
@@ -211,14 +210,15 @@ public class GameFlowController : MonoBehaviour
         touchControls.transform.SetParent(canvasObject.transform, false);
         Stretch(touchControls.GetComponent<RectTransform>());
 
-        VirtualButtonControl jumpControl = CreateVirtualButton("Jump Control", "<Gamepad>/buttonSouth");
         VirtualButtonControl crouchControl = CreateVirtualButton("Crouch Control", "<Gamepad>/buttonEast");
-        VirtualButtonControl attackControl = CreateVirtualButton("Attack Control", "<Gamepad>/buttonWest");
         VirtualButtonControl sprintControl = CreateVirtualButton("Sprint Control", "<Gamepad>/leftStickPress");
 
-        CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, crouchControl, jumpControl, sprintControl);
-        CreateTouchZone(touchControls.transform, "Camera Zone", new Vector2(0.5f, 0f), new Vector2(1f, 1f), "<Gamepad>/rightStick", false, attackControl, null, null);
-        CreateTouchButton(touchControls.transform, "INTERACT", new Vector2(-560f, 430f), "<Gamepad>/buttonNorth");
+        CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, crouchControl, null, sprintControl);
+        CreateTouchButton(touchControls.transform, "ATTACK", new Vector2(-170f, 190f), "<Gamepad>/buttonWest");
+        CreateTouchButton(touchControls.transform, "AIM", new Vector2(-360f, 190f), "<Gamepad>/rightShoulder");
+        CreateTouchButton(touchControls.transform, "JUMP", new Vector2(-170f, 380f), "<Gamepad>/buttonSouth");
+        CreateTouchButton(touchControls.transform, "INTERACT", new Vector2(-550f, 280f), "<Gamepad>/buttonNorth");
+        CreateTouchButton(touchControls.transform, "PAUSE", new Vector2(-100f, -100f), "<Gamepad>/start", true);
 
         touchControls.SetActive(false);
     }
@@ -370,7 +370,7 @@ public class GameFlowController : MonoBehaviour
         if (playerCamera != null)
             playerCamera.GetComponent<Camera>().fieldOfView = PlayerPrefs.GetFloat("FieldOfView", 60f);
         QualitySettings.vSyncCount = PlayerPrefs.GetInt("VSync", 1);
-        Application.targetFrameRate = 120;
+        Application.targetFrameRate = Application.isMobilePlatform ? 60 : 120;
         if (!Application.isEditor && !Application.isMobilePlatform)
             Screen.fullScreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
         PlayerPrefs.Save();
@@ -534,14 +534,14 @@ public class GameFlowController : MonoBehaviour
         stick.Configure(movementZone, holdAction, tapAction, sprintAction);
     }
 
-    void CreateTouchButton(Transform parent, string label, Vector2 position, string controlPath)
+    void CreateTouchButton(Transform parent, string label, Vector2 position, string controlPath, bool topAnchored = false)
     {
         GameObject button = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(OnScreenButton));
         button.transform.SetParent(parent, false);
 
         RectTransform rect = button.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(1f, 0f);
-        rect.anchorMax = new Vector2(1f, 0f);
+        rect.anchorMin = topAnchored ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
+        rect.anchorMax = rect.anchorMin;
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = position;
         rect.sizeDelta = new Vector2(140f, 140f);

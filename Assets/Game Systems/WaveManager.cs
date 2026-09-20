@@ -5,6 +5,8 @@ using UnityEngine.AI;
 
 public class WaveManager : MonoBehaviour
 {
+    public event System.Action<int> WaveCleared;
+
     public Enemy raccoonTemplate;
     public Enemy bearTemplate;
     public Enemy flyingTemplate;
@@ -66,6 +68,9 @@ public class WaveManager : MonoBehaviour
                 activeEnemies.RemoveAll(enemy => enemy == null);
                 yield return null;
             }
+
+            if (tree.IsAlive && player.IsAlive)
+                WaveCleared?.Invoke(CurrentWave);
 
             if (tree.IsAlive && player.IsAlive)
                 yield return new WaitForSeconds(timeBetweenWaves);

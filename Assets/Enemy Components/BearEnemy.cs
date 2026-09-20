@@ -10,6 +10,7 @@ public class BearEnemy : MonoBehaviour
     public float aggroTime = 5f;
     public float honeyRange = 10f;
     public float honeyPrepareTime = 1.5f;
+    public float honeyLockTime = 0.5f;
     public float honeyDelay = 6f;
 
     private Enemy enemy;
@@ -20,6 +21,7 @@ public class BearEnemy : MonoBehaviour
     private float honeyTimer;
     private float prepareTimer;
     private bool preparingHoney;
+    private HoneyPuddle honeyWarning;
 
     void Start()
     {
@@ -56,6 +58,7 @@ public class BearEnemy : MonoBehaviour
         {
             preparingHoney = true;
             prepareTimer = honeyPrepareTime;
+            CreateHoneyWarning();
 
             if (enemyRenderer != null)
                 enemyRenderer.material.color = Color.yellow;
@@ -65,9 +68,15 @@ public class BearEnemy : MonoBehaviour
         {
             prepareTimer -= Time.deltaTime;
 
+            if (honeyWarning != null && prepareTimer > honeyLockTime)
+                honeyWarning.transform.position = GetHoneyPosition(player.transform.position);
+
             if (prepareTimer <= 0f)
             {
-                CreateHoney(player.transform.position);
+                if (honeyWarning != null)
+                    honeyWarning.Activate();
+
+                honeyWarning = null;
                 preparingHoney = false;
                 honeyTimer = honeyDelay;
 
@@ -118,15 +127,27 @@ public class BearEnemy : MonoBehaviour
         aggroTimer = aggroTime;
     }
 
-    void CreateHoney(Vector3 position)
+    void CreateHoneyWarning()
     {
         GameObject honey = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        honey.name = "Honey Puddle";
-        honey.transform.position = new Vector3(position.x, 0.1f, position.z);
+        honey.name = "Honey Warning";
+        honey.transform.position = GetHoneyPosition(player.transform.position);
         honey.transform.localScale = new Vector3(2f, 0.05f, 2f);
-        honey.GetComponent<Collider>().isTrigger = true;
-        honey.GetComponent<Renderer>().material.color = Color.yellow;
-        honey.AddComponent<HoneyPuddle>();
+        Collider honeyCollider = honey.GetComponent<Collider>();
+        honeyCollider.isTrigger = true;
+        honeyWarning = honey.AddComponent<HoneyPuddle>();
+        honeyWarning.ShowWarning();
+    }
+
+    Vector3 GetHoneyPosition(Vector3 position)
+    {
+        return new Vector3(position.x, 0.1f, position.z);
+    }
+
+    void OnDestroy()
+    {
+        if (honeyWarning != null)
+            Destroy(honeyWarning.gameObject);
     }
 
     void MoveTo(Vector3 targetPosition)

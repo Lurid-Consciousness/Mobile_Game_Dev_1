@@ -20,13 +20,17 @@ public class PlayerController : MonoBehaviour
     public float interactRange = 2f;
     public float throwForce = 10f;
     public float maxHealth = 100f;
+    public float turnSpeed = 160f;
+    public float quickThrowCharge = 0.45f;
 
     public float HealthPercent => currentHealth / maxHealth;
     public bool IsAlive => currentHealth > 0f;
     public bool CanPickup { get; private set; }
     public bool IsGliding { get; private set; }
+    public bool IsPrecisionAiming { get; private set; }
     public Defence TargetDefence { get; private set; }
-    public string ButtonPrompt => interactAction.action.GetBindingDisplayString();
+    public string ButtonPrompt => Application.isMobilePlatform ? "INTERACT" : interactAction.action.GetBindingDisplayString();
+    public Vector2 AimInput => moveInput;
 
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
@@ -35,7 +39,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 moveInput;
     private InputAction jumpAction;
     private InputAction crouchAction;
-    private InputAction curveAction;
+    private InputAction aimAction;
     private InputAction sprintAction;
     private float standingHeight;
     private Vector3 standingCenter;
@@ -62,7 +66,7 @@ public class PlayerController : MonoBehaviour
 
         jumpAction = moveAction.action.actionMap.FindAction("Jump");
         crouchAction = moveAction.action.actionMap.FindAction("Crouch");
-        curveAction = moveAction.action.actionMap.FindAction("Curve");
+        aimAction = moveAction.action.actionMap.FindAction("Aim");
         sprintAction = moveAction.action.actionMap.FindAction("Sprint");
 
         standingHeight = playerCollider.height;
@@ -79,7 +83,7 @@ public class PlayerController : MonoBehaviour
         interactAction.action.Enable();
         jumpAction.Enable();
         crouchAction?.Enable();
-        curveAction?.Enable();
+        aimAction?.Enable();
         sprintAction.Enable();
 
         if (throwAction != null)
@@ -99,8 +103,9 @@ public class PlayerController : MonoBehaviour
         interactAction.action.Disable();
         jumpAction.Disable();
         crouchAction?.Disable();
-        curveAction?.Disable();
+        aimAction?.Disable();
         sprintAction.Disable();
+        IsPrecisionAiming = false;
 
         if (throwAction != null)
             throwAction.action.Disable();
@@ -116,27 +121,26 @@ public class PlayerController : MonoBehaviour
             slowMultiplier = 1f;
 
         moveInput = moveAction.action.ReadValue<Vector2>();
-        SetCrouching(crouchAction != null && crouchAction.IsPressed());
 
-        if (boomerang != null && curveAction != null && boomerang.IsReady)
-        {
-            float scroll = curveAction.ReadValue<float>();
-            if (Mathf.Abs(scroll) > 0.01f)
-                boomerang.AdjustCurve(Mathf.Sign(scroll) * PlayerPrefs.GetFloat("CurveStep", 15f));
-        }
+        if (aimAction != null && aimAction.WasPressedThisFrame())
+            SetPrecisionAiming(!IsPrecisionAiming);
 
-        if (jumpAction.WasPressedThisFrame() && IsGrounded())
+        SetCrouching(!IsPrecisionAiming && crouchAction != null && crouchAction.IsPressed());
+
+        if (!IsPrecisionAiming && jumpAction.WasPressedThisFrame() && IsGrounded())
             jumpRequested = true;
 
         TargetDefence = null;
-        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit interactionHit, interactRange, ~0, QueryTriggerInteraction.Collide))
+
+        if (!IsPrecisionAiming && Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit interactionHit, interactRange, ~0, QueryTriggerInteraction.Collide))
         {
             Defence barrier = interactionHit.collider.GetComponentInParent<Defence>();
+
             if (barrier != null && Vector3.Distance(transform.position, interactionHit.collider.ClosestPoint(transform.position)) <= 3.5f)
                 TargetDefence = barrier;
         }
 
-        if (interactAction.action.WasPressedThisFrame())
+        if (!IsPrecisionAiming && interactAction.action.WasPressedThisFrame())
         {
             if (TargetDefence != null && TargetDefence.NeedsRepair)
                 TargetDefence.TryRepair(wallet);
@@ -150,39 +154,44 @@ public class PlayerController : MonoBehaviour
 
         if (throwAction != null && heldObject != null)
         {
-            if (throwAction.action.WasPressedThisFrame())
+            if (!IsPrecisionAiming && throwAction.action.WasPressedThisFrame())
                 Throw();
         }
         else if (throwAction != null && boomerang != null)
         {
-            if (throwAction.action.WasPressedThisFrame() && boomerang.IsReady)
+            if (!IsPrecisionAiming)
             {
-                boomerang.BeginCharge();
-                if (powerups != null)
-                    powerups.ClearTargets();
-                isChargingBoomerang = true;
+                if (throwAction.action.WasPressedThisFrame() && boomerang.IsReady)
+                    QuickThrow();
             }
-
-            if (isChargingBoomerang && throwAction.action.IsPressed())
+            else
             {
-                boomerang.Charge(Time.deltaTime);
-                if (powerups != null)
-                    powerups.UpdateTargets(cameraTransform, boomerang.ChargeAmount);
-                boomerang.ShowPath(interactPoint.position, cameraTransform.forward, powerups != null ? powerups.Targets : null);
-            }
+                if (throwAction.action.WasPressedThisFrame() && boomerang.IsReady)
+                {
+                    boomerang.BeginCharge();
+                    isChargingBoomerang = true;
+                }
 
-            if (isChargingBoomerang && throwAction.action.WasReleasedThisFrame())
-            {
-                boomerang.Launch(cameraTransform.forward, boomerang.ChargeAmount, powerups != null ? powerups.Targets : null);
-                if (powerups != null)
-                    powerups.ClearTargets();
-                if (motion != null)
-                    motion.Attack();
-                isChargingBoomerang = false;
+                if (isChargingBoomerang && throwAction.action.IsPressed())
+                {
+                    boomerang.Charge(Time.deltaTime);
+                    boomerang.ShowPrecisionPath(interactPoint.position, cameraTransform.forward);
+                }
+
+                if (isChargingBoomerang && throwAction.action.WasReleasedThisFrame())
+                {
+                    boomerang.LaunchPrecision(cameraTransform.forward, boomerang.ChargeAmount);
+
+                    if (motion != null)
+                        motion.Attack();
+
+                    isChargingBoomerang = false;
+                    SetPrecisionAiming(false);
+                }
             }
         }
 
-        CanPickup = heldObject == null && FindPickup() != null;
+        CanPickup = !IsPrecisionAiming && heldObject == null && FindPickup() != null;
     }
 
     void FixedUpdate()
@@ -190,33 +199,34 @@ public class PlayerController : MonoBehaviour
         if (IsGliding)
             return;
 
-        Quaternion playerRotation = Quaternion.Euler(0f, cameraTransform.eulerAngles.y, 0f);
-        rb.MoveRotation(playerRotation);
+        if (IsPrecisionAiming)
+        {
+            Quaternion aimRotation = Quaternion.Euler(0f, cameraTransform.eulerAngles.y, 0f);
+            rb.MoveRotation(aimRotation);
 
-        Vector3 forward = cameraTransform.forward;
-        Vector3 right = cameraTransform.right;
+            Vector3 stoppedVelocity = rb.linearVelocity;
+            stoppedVelocity.x = 0f;
+            stoppedVelocity.z = 0f;
+            rb.linearVelocity = stoppedVelocity;
+        }
+        else
+        {
+            float rotationAmount = moveInput.x * turnSpeed * Time.fixedDeltaTime;
+            rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, rotationAmount, 0f));
 
-        forward.y = 0f;
-        right.y = 0f;
+            float currentSpeed = moveSpeed;
 
-        forward.Normalize();
-        right.Normalize();
+            if (isCrouching)
+                currentSpeed = crouchSpeed;
+            else if (powerups != null && powerups.CanSprint && sprintAction.IsPressed())
+                currentSpeed = sprintSpeed;
 
-        Vector3 move = forward * moveInput.y + right * moveInput.x;
-        move.Normalize();
+            currentSpeed *= slowMultiplier;
 
-        float currentSpeed = moveSpeed;
-
-        if (isCrouching)
-            currentSpeed = crouchSpeed;
-        else if (powerups != null && powerups.CanSprint && sprintAction.IsPressed())
-            currentSpeed = sprintSpeed;
-
-        currentSpeed *= slowMultiplier;
-
-        Vector3 velocity = move * currentSpeed;
-        velocity.y = rb.linearVelocity.y;
-        rb.linearVelocity = velocity;
+            Vector3 velocity = transform.forward * moveInput.y * currentSpeed;
+            velocity.y = rb.linearVelocity.y;
+            rb.linearVelocity = velocity;
+        }
 
         if (jumpRequested)
         {
@@ -228,6 +238,45 @@ public class PlayerController : MonoBehaviour
         {
             heldObject.MovePosition(interactPoint.position);
             heldObject.MoveRotation(interactPoint.rotation);
+        }
+    }
+
+    void QuickThrow()
+    {
+        if (powerups != null)
+        {
+            powerups.ClearTargets();
+            powerups.UpdateTargets(cameraTransform, 1f);
+        }
+
+        boomerang.Launch(cameraTransform.forward, quickThrowCharge, powerups != null ? powerups.Targets : null);
+
+        if (powerups != null)
+            powerups.ClearTargets();
+
+        if (motion != null)
+            motion.Attack();
+    }
+
+    public void SetPrecisionAiming(bool aiming)
+    {
+        if (aiming && (IsGliding || heldObject != null || boomerang == null || !boomerang.IsReady))
+            return;
+
+        IsPrecisionAiming = aiming;
+        jumpRequested = false;
+
+        if (aiming)
+        {
+            SetCrouching(false);
+
+            if (powerups != null)
+                powerups.ClearTargets();
+        }
+        else if (isChargingBoomerang && boomerang != null && boomerang.IsReady)
+        {
+            boomerang.CancelCharge();
+            isChargingBoomerang = false;
         }
     }
 
@@ -295,6 +344,8 @@ public class PlayerController : MonoBehaviour
 
     public void SetGliding(bool gliding)
     {
+        SetPrecisionAiming(false);
+
         if (gliding && heldObject != null)
             Drop();
 
@@ -315,6 +366,7 @@ public class PlayerController : MonoBehaviour
 
     void Pickup()
     {
+        SetPrecisionAiming(false);
 
         Rigidbody objectRb = FindPickup();
 
