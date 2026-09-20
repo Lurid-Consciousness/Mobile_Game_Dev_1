@@ -16,7 +16,22 @@ public class HoneyPuddle : MonoBehaviour
         puddleRenderer = GetComponent<Renderer>();
 
         if (puddleRenderer != null)
-            puddleMaterial = puddleRenderer.material;
+        {
+            Shader honeyShader = Shader.Find("Universal Render Pipeline/Lit");
+
+            if (honeyShader == null)
+                honeyShader = Shader.Find("Universal Render Pipeline/Unlit");
+
+            if (honeyShader != null)
+            {
+                puddleMaterial = new Material(honeyShader);
+                puddleRenderer.material = puddleMaterial;
+            }
+            else
+            {
+                puddleMaterial = puddleRenderer.material;
+            }
+        }
     }
 
     public void ShowWarning()
@@ -27,7 +42,7 @@ public class HoneyPuddle : MonoBehaviour
         if (puddleMaterial != null)
         {
             SetTransparent(true);
-            puddleMaterial.color = new Color(1f, 0.75f, 0f, 0.3f);
+            SetColor(new Color(1f, 0.65f, 0.05f, 0.35f));
         }
     }
 
@@ -44,7 +59,7 @@ public class HoneyPuddle : MonoBehaviour
         if (puddleMaterial != null)
         {
             SetTransparent(false);
-            puddleMaterial.color = Color.yellow;
+            SetColor(new Color(1f, 0.55f, 0.02f, 1f));
         }
 
         Destroy(gameObject, lifetime);
@@ -84,5 +99,13 @@ public class HoneyPuddle : MonoBehaviour
             puddleMaterial.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
             puddleMaterial.renderQueue = (int)RenderQueue.Geometry;
         }
+    }
+
+    void SetColor(Color color)
+    {
+        puddleMaterial.color = color;
+
+        if (puddleMaterial.HasProperty("_BaseColor"))
+            puddleMaterial.SetColor("_BaseColor", color);
     }
 }

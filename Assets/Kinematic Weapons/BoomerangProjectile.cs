@@ -11,14 +11,14 @@ public class BoomerangProjectile : MonoBehaviour
     public float minimumFlightTime = 1f;
     public float maximumFlightTime = 2f;
     public float chargeTime = 1.5f;
-    public float curveAmount = 3f;
-    public float arcHeight = 2f;
+    public float curveAmount = 1.25f;
+    public float arcHeight = 1.15f;
     public float spinSpeed = 720f;
     public float damage = 20f;
     public Vector3 spinAxis = Vector3.up;
     public int pathPoints = 40;
     public float precisionDamageMultiplier = 2f;
-    public float precisionCurveMultiplier = 0.35f;
+    public float precisionCurveMultiplier = 0.2f;
     public float ricochetDistance = 2f;
     public float ricochetReturnTime = 0.7f;
 

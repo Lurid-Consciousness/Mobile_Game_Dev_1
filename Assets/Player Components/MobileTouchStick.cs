@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.OnScreen;
 using UnityEngine.UI;
+using System;
 
 public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
@@ -14,13 +15,12 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
     public float centerThreshold = 0.3f;
     public float centerHoldTime = 2f;
     public float jumpTapTime = 0.35f;
-    public float sprintActivationDistance = 210f;
+    public event Action<bool> AutoRunChanged;
+    public bool AutoRun => autoRun;
 
     private RectTransform zoneRect;
     private RectTransform baseVisual;
     private RectTransform handleVisual;
-    private RectTransform sprintTarget;
-    private Image sprintTargetImage;
     private Text statusText;
     private VirtualButtonControl centerAction;
     private VirtualButtonControl tapAction;
@@ -101,13 +101,6 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
         baseVisual.gameObject.SetActive(true);
         handleVisual.anchoredPosition = Vector2.zero;
 
-        if (sprintTarget != null)
-        {
-            sprintTarget.anchoredPosition = touchOrigin + Vector2.up * sprintActivationDistance;
-            sprintTarget.gameObject.SetActive(true);
-            sprintTargetImage.color = new Color(0.96f, 0.72f, 0.2f, 0.72f);
-        }
-
         statusText.text = movementStick ? "DRAG: MOVE   HOLD: CROUCH" : "HOLD: CHARGE";
         SendValueToControl(Vector2.zero);
     }
@@ -120,12 +113,6 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
         RectTransformUtility.ScreenPointToLocalPointInRectangle(zoneRect, eventData.position, eventData.pressEventCamera, out Vector2 localPoint);
         Vector2 movement = localPoint - touchOrigin;
         largestDistance = Mathf.Max(largestDistance, movement.magnitude / movementRange);
-
-        if (movementStick && sprintAction != null && movement.y >= sprintActivationDistance && Mathf.Abs(movement.x) <= movementRange)
-        {
-            LockAutoRun();
-            return;
-        }
 
         Vector2 limitedMovement = Vector2.ClampMagnitude(movement, movementRange);
         stickValue = limitedMovement / movementRange;
@@ -157,9 +144,15 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
             SendValueToControl(Vector2.zero);
             baseVisual.gameObject.SetActive(false);
 
-            if (sprintTarget != null)
-                sprintTarget.gameObject.SetActive(false);
         }
+    }
+
+    public void ToggleAutoRun()
+    {
+        if (autoRun)
+            CancelAutoRun();
+        else
+            LockAutoRun();
     }
 
     void LockAutoRun()
@@ -174,8 +167,8 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
 
         centerPressed = false;
         handleVisual.anchoredPosition = Vector2.up * movementRange;
-        sprintTargetImage.color = new Color(0.25f, 0.9f, 0.3f, 0.9f);
         statusText.text = "AUTO RUN\nTOUCH LEFT SIDE TO CANCEL";
+        AutoRunChanged?.Invoke(true);
     }
 
     void CancelAutoRun()
@@ -186,13 +179,15 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
 
         if (sprintAction != null)
             sprintAction.SetPressed(false);
+
+        AutoRunChanged?.Invoke(false);
     }
 
     Vector2 ClampOrigin(Vector2 point)
     {
         float horizontalPadding = movementRange + 20f;
         float bottomPadding = movementRange + 20f;
-        float topPadding = movementRange + (movementStick ? sprintActivationDistance + 80f : 20f);
+        float topPadding = movementRange + 20f;
 
         point.x = Mathf.Clamp(point.x, zoneRect.rect.xMin + horizontalPadding, zoneRect.rect.xMax - horizontalPadding);
         point.y = Mathf.Clamp(point.y, zoneRect.rect.yMin + bottomPadding, zoneRect.rect.yMax - topPadding);
@@ -243,43 +238,13 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
         statusRect.anchoredPosition = new Vector2(0f, -165f);
         statusRect.sizeDelta = new Vector2(420f, 70f);
         statusText = statusObject.GetComponent<Text>();
-        statusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        statusText.fontSize = 19;
+        statusText.font = Resources.Load<Font>("UI/Fonts/AtkinsonHyperlegible-Bold") ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        statusText.fontSize = 26;
         statusText.alignment = TextAnchor.MiddleCenter;
         statusText.color = Color.white;
         statusText.text = movementStick ? "DRAG: MOVE   HOLD: CROUCH" : "HOLD: CHARGE";
 
-        if (movementStick)
-        {
-            GameObject sprintObject = new GameObject("Auto Run Target", typeof(RectTransform), typeof(Image));
-            sprintObject.transform.SetParent(transform, false);
-            sprintTarget = sprintObject.GetComponent<RectTransform>();
-            sprintTarget.anchorMin = new Vector2(0.5f, 0.5f);
-            sprintTarget.anchorMax = new Vector2(0.5f, 0.5f);
-            sprintTarget.pivot = new Vector2(0.5f, 0.5f);
-            sprintTarget.sizeDelta = new Vector2(190f, 85f);
-            sprintTargetImage = sprintObject.GetComponent<Image>();
-            sprintTargetImage.color = new Color(0.96f, 0.72f, 0.2f, 0.72f);
-
-            GameObject sprintTextObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            sprintTextObject.transform.SetParent(sprintObject.transform, false);
-            RectTransform sprintTextRect = sprintTextObject.GetComponent<RectTransform>();
-            sprintTextRect.anchorMin = Vector2.zero;
-            sprintTextRect.anchorMax = Vector2.one;
-            sprintTextRect.offsetMin = Vector2.zero;
-            sprintTextRect.offsetMax = Vector2.zero;
-            Text sprintText = sprintTextObject.GetComponent<Text>();
-            sprintText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            sprintText.fontSize = 22;
-            sprintText.alignment = TextAnchor.MiddleCenter;
-            sprintText.color = Color.black;
-            sprintText.text = "AUTO RUN";
-        }
-
         baseVisual.gameObject.SetActive(false);
-
-        if (sprintTarget != null)
-            sprintTarget.gameObject.SetActive(false);
     }
 
     void CreateGlyph(Transform parent, string resourcePath)
@@ -317,6 +282,8 @@ public class MobileTouchStick : OnScreenControl, IPointerDownHandler, IDragHandl
 
         if (sprintAction != null)
             sprintAction.SetPressed(false);
+
+        AutoRunChanged?.Invoke(false);
 
         SendValueToControl(Vector2.zero);
         base.OnDisable();

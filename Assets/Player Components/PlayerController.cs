@@ -22,6 +22,7 @@ public class PlayerController : MonoBehaviour
     public float maxHealth = 100f;
     public float turnSpeed = 160f;
     public float quickThrowCharge = 0.45f;
+    public float aimViewportY = 0.44f;
 
     public float HealthPercent => currentHealth / maxHealth;
     public bool IsAlive => currentHealth > 0f;
@@ -31,6 +32,7 @@ public class PlayerController : MonoBehaviour
     public Defence TargetDefence { get; private set; }
     public string ButtonPrompt => Application.isMobilePlatform ? "INTERACT" : interactAction.action.GetBindingDisplayString();
     public Vector2 AimInput => moveInput;
+    public Vector3 AimDirection => GetAimRay().direction;
 
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
@@ -132,7 +134,9 @@ public class PlayerController : MonoBehaviour
 
         TargetDefence = null;
 
-        if (!IsPrecisionAiming && Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit interactionHit, interactRange, ~0, QueryTriggerInteraction.Collide))
+        Ray aimRay = GetAimRay();
+
+        if (!IsPrecisionAiming && Physics.Raycast(aimRay, out RaycastHit interactionHit, interactRange, ~0, QueryTriggerInteraction.Collide))
         {
             Defence barrier = interactionHit.collider.GetComponentInParent<Defence>();
 
@@ -175,12 +179,12 @@ public class PlayerController : MonoBehaviour
                 if (isChargingBoomerang && throwAction.action.IsPressed())
                 {
                     boomerang.Charge(Time.deltaTime);
-                    boomerang.ShowPrecisionPath(interactPoint.position, cameraTransform.forward);
+                    boomerang.ShowPrecisionPath(interactPoint.position, AimDirection);
                 }
 
                 if (isChargingBoomerang && throwAction.action.WasReleasedThisFrame())
                 {
-                    boomerang.LaunchPrecision(cameraTransform.forward, boomerang.ChargeAmount);
+                    boomerang.LaunchPrecision(AimDirection, boomerang.ChargeAmount);
 
                     if (motion != null)
                         motion.Attack();
@@ -246,10 +250,10 @@ public class PlayerController : MonoBehaviour
         if (powerups != null)
         {
             powerups.ClearTargets();
-            powerups.UpdateTargets(cameraTransform, 1f);
+            powerups.UpdateTargets(cameraTransform.position, AimDirection, 1f);
         }
 
-        boomerang.Launch(cameraTransform.forward, quickThrowCharge, powerups != null ? powerups.Targets : null);
+        boomerang.Launch(AimDirection, quickThrowCharge, powerups != null ? powerups.Targets : null);
 
         if (powerups != null)
             powerups.ClearTargets();
@@ -331,7 +335,7 @@ public class PlayerController : MonoBehaviour
 
     Rigidbody FindPickup()
     {
-        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit hit, interactRange, ~0, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(GetAimRay(), out RaycastHit hit, interactRange, ~0, QueryTriggerInteraction.Ignore))
         {
             Rigidbody objectRb = hit.collider.attachedRigidbody;
 
@@ -340,6 +344,16 @@ public class PlayerController : MonoBehaviour
                 return objectRb;
         }
         return null;
+    }
+
+    Ray GetAimRay()
+    {
+        Camera playerCamera = cameraTransform.GetComponent<Camera>();
+
+        if (playerCamera != null)
+            return playerCamera.ViewportPointToRay(new Vector3(0.5f, aimViewportY, 0f));
+
+        return new Ray(cameraTransform.position, cameraTransform.forward);
     }
 
     public void SetGliding(bool gliding)
@@ -425,10 +439,10 @@ public class PlayerController : MonoBehaviour
         Drop();
 
         if (acornProjectile != null)
-            acornProjectile.Launch(cameraTransform.forward);
+            acornProjectile.Launch(AimDirection);
         else
         {
-            thrownObject.AddForce(cameraTransform.forward * throwForce, ForceMode.Impulse);
+            thrownObject.AddForce(AimDirection * throwForce, ForceMode.Impulse);
             GameAudio.PlayThrow();
         }
     }

@@ -37,7 +37,7 @@ public class PlayerPowerups : MonoBehaviour
         nextScan = 0f;
     }
 
-    public void UpdateTargets(Transform aim, float charge)
+    public void UpdateTargets(Vector3 aimPosition, Vector3 aimDirection, float charge)
     {
         if (LockRemaining <= 0f)
         {
@@ -48,7 +48,7 @@ public class PlayerPowerups : MonoBehaviour
             return;
         nextScan = Time.time + 0.1f;
 
-        Targets.RemoveAll(enemy => !CanLock(enemy, aim));
+        Targets.RemoveAll(enemy => !CanLock(enemy, aimPosition, aimDirection));
         int count = 1 + Mathf.FloorToInt(Mathf.Clamp01(charge) * 3f);
         Enemy[] enemies = FindObjectsByType<Enemy>(FindObjectsSortMode.None);
         while (Targets.Count < count)
@@ -57,9 +57,9 @@ public class PlayerPowerups : MonoBehaviour
             float bestAngle = float.MaxValue;
             foreach (Enemy enemy in enemies)
             {
-                if (Targets.Contains(enemy) || !CanLock(enemy, aim))
+                if (Targets.Contains(enemy) || !CanLock(enemy, aimPosition, aimDirection))
                     continue;
-                float angle = Vector3.Angle(aim.forward, enemy.transform.position - aim.position);
+                float angle = Vector3.Angle(aimDirection, enemy.transform.position - aimPosition);
                 if (angle < bestAngle)
                 {
                     bestAngle = angle;
@@ -72,14 +72,14 @@ public class PlayerPowerups : MonoBehaviour
         }
     }
 
-    private bool CanLock(Enemy enemy, Transform aim)
+    private bool CanLock(Enemy enemy, Vector3 aimPosition, Vector3 aimDirection)
     {
         if (enemy == null || enemy.HealthPercent <= 0f || !enemy.gameObject.activeInHierarchy)
             return false;
-        Vector3 offset = enemy.transform.position - aim.position;
-        if (offset.magnitude > lockRange || Vector3.Angle(aim.forward, offset) > lockAngle)
+        Vector3 offset = enemy.transform.position - aimPosition;
+        if (offset.magnitude > lockRange || Vector3.Angle(aimDirection, offset) > lockAngle)
             return false;
-        foreach (RaycastHit hit in Physics.RaycastAll(aim.position, offset.normalized, offset.magnitude, ~0, QueryTriggerInteraction.Ignore))
+        foreach (RaycastHit hit in Physics.RaycastAll(aimPosition, offset.normalized, offset.magnitude, ~0, QueryTriggerInteraction.Ignore))
         {
             if (hit.collider.GetComponentInParent<PlayerController>() == GetComponent<PlayerController>())
                 continue;

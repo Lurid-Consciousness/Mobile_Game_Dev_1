@@ -20,8 +20,20 @@ public class GameFlowController : MonoBehaviour
     private GameObject settingsPanel;
     private GameObject creditsPanel;
     private GameObject gameOverPanel;
+    private GameObject tutorialPanel;
     private GameObject touchControls;
     private Text failReason;
+    private Image tutorialImage;
+    private Text tutorialTitle;
+    private Text tutorialBody;
+    private Text tutorialPageText;
+    private Text[] tutorialCallouts;
+    private Button tutorialBackButton;
+    private Button tutorialNextButton;
+    private Sprite[] tutorialSprites;
+    private int tutorialPage;
+    private Font regularFont;
+    private Font boldFont;
 
     private bool gameRunning;
     private bool startAfterReload;
@@ -53,6 +65,8 @@ public class GameFlowController : MonoBehaviour
         }
 
         instance = this;
+        regularFont = Resources.Load<Font>("UI/Fonts/AtkinsonHyperlegible-Regular");
+        boldFont = Resources.Load<Font>("UI/Fonts/AtkinsonHyperlegible-Bold");
         Screen.autorotateToPortrait = false;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = true;
@@ -121,13 +135,14 @@ public class GameFlowController : MonoBehaviour
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.referenceResolution = new Vector2(2340f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
 
         CreateMainPanel();
         CreateSettingsPanel();
         CreateCreditsPanel();
         CreateGameOverPanel();
+        CreateTutorialPanel();
         CreateTouchControls();
     }
 
@@ -148,10 +163,10 @@ public class GameFlowController : MonoBehaviour
         mainPanel = CreateFullPanel("Main Menu", backgroundColor);
         GameObject menu = CreateCenteredPanel(mainPanel.transform, "Menu", new Vector2(640f, 760f), panelColor);
 
-        CreateText(menu.transform, "TREE DEFENCE", new Vector2(0f, 245f), new Vector2(560f, 120f), 62, accentColor);
-        CreateText(menu.transform, "Protect the tree. Survive the waves.", new Vector2(0f, 155f), new Vector2(560f, 55f), 24, Color.white);
+        CreateText(menu.transform, "TREE DEFENCE", new Vector2(0f, 245f), new Vector2(590f, 120f), 68, accentColor);
+        CreateText(menu.transform, "Protect the tree. Survive the waves.", new Vector2(0f, 155f), new Vector2(590f, 65f), 30, Color.white);
 
-        CreateButton(menu.transform, "PLAY / RESUME", new Vector2(0f, 55f), StartGame);
+        CreateButton(menu.transform, "PLAY / RESUME", new Vector2(0f, 55f), PlayFromMenu);
         CreateButton(menu.transform, "SETTINGS", new Vector2(0f, -45f), ShowSettings);
         CreateButton(menu.transform, "CREDITS", new Vector2(0f, -145f), ShowCredits);
         CreateButton(menu.transform, "QUIT", new Vector2(0f, -245f), QuitGame);
@@ -163,7 +178,7 @@ public class GameFlowController : MonoBehaviour
         GameObject menu = CreateCenteredPanel(settingsPanel.transform, "Settings Menu", new Vector2(800f, 960f), panelColor);
 
         CreateText(menu.transform, "SETTINGS", new Vector2(0f, 410f), new Vector2(560f, 70f), 45, accentColor);
-        CreateText(menu.transform, "MASTER VOLUME", new Vector2(0f, 340f), new Vector2(500f, 40f), 24, Color.white);
+        CreateText(menu.transform, "MASTER VOLUME", new Vector2(0f, 340f), new Vector2(500f, 50f), 30, Color.white);
 
         Slider slider = CreateSlider(menu.transform, new Vector2(0f, 300f));
         slider.value = PlayerPrefs.GetFloat("MasterVolume", 1f);
@@ -175,7 +190,7 @@ public class GameFlowController : MonoBehaviour
         AddSettingButton(menu.transform, "Invert Y", "InvertY", -100f, 0);
         AddSettingButton(menu.transform, "VSync", "VSync", -190f, 1);
         AddSettingButton(menu.transform, "Fullscreen", "Fullscreen", -280f, 1);
-        CreateText(menu.transform, "VSync off: 120 FPS cap. Esc pauses / resumes.", new Vector2(0f, -350f), new Vector2(720f, 40f), 22, Color.white);
+        CreateText(menu.transform, "VSync off: 120 FPS cap. Esc pauses / resumes.", new Vector2(0f, -350f), new Vector2(760f, 50f), 26, Color.white);
         CreateButton(menu.transform, "BACK", new Vector2(0f, -410f), ShowMainMenu);
         ApplySettings();
         settingsPanel.SetActive(false);
@@ -187,7 +202,7 @@ public class GameFlowController : MonoBehaviour
         GameObject menu = CreateCenteredPanel(creditsPanel.transform, "Credits Menu", new Vector2(760f, 680f), panelColor);
 
         CreateText(menu.transform, "CREDITS", new Vector2(0f, 245f), new Vector2(660f, 90f), 50, accentColor);
-        CreateText(menu.transform, "Game Design: Wael Al-Malki\nProgramming: Wael Al-Malki, with Codex assistance\n\nAudio / Input Glyphs: Kenney (CC0)\nImpact Sounds, UI Audio, Input Prompts\n\nNature / Raccoon + Animations: Quaternius (CC0)\nUltimate Nature, Cube World Kit\nGrass / Ground Textures: ambientCG (CC0)\nGrass004, Ground037\n\nPrototype squirrel, bear, balloon possum and\nprocedural animation: assembled with Codex\nBoomerang model: supplied by project author", new Vector2(0f, 15f), new Vector2(700f, 430f), 22, Color.white);
+        CreateText(menu.transform, "Game Design: Wael Al-Malki\nProgramming: Wael Al-Malki, with Codex assistance\n\nAudio / Input Glyphs: Kenney (CC0)\nImpact Sounds, UI Audio, Input Prompts\n\nNature / Raccoon + Animations: Quaternius (CC0)\nUltimate Nature, Cube World Kit\nGrass / Ground Textures: ambientCG (CC0)\nGrass004, Ground037\n\nPrototype squirrel, bear, balloon possum and\nprocedural animation: assembled with Codex\nBoomerang model: supplied by project author\nUI font: Atkinson Hyperlegible (OFL)", new Vector2(0f, 15f), new Vector2(720f, 470f), 26, Color.white);
         CreateButton(menu.transform, "BACK", new Vector2(0f, -245f), ShowMainMenu);
         creditsPanel.SetActive(false);
     }
@@ -204,6 +219,49 @@ public class GameFlowController : MonoBehaviour
         gameOverPanel.SetActive(false);
     }
 
+    void CreateTutorialPanel()
+    {
+        tutorialPanel = CreateFullPanel("Tutorial", backgroundColor);
+        GameObject panel = CreateCenteredPanel(tutorialPanel.transform, "Tutorial Panel", new Vector2(2180f, 940f), panelColor);
+
+        GameObject imageObject = new GameObject("Gameplay Screenshot", typeof(RectTransform), typeof(Image));
+        imageObject.transform.SetParent(panel.transform, false);
+        RectTransform imageRect = imageObject.GetComponent<RectTransform>();
+        imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+        imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+        imageRect.pivot = new Vector2(0.5f, 0.5f);
+        imageRect.anchoredPosition = new Vector2(-420f, 45f);
+        imageRect.sizeDelta = new Vector2(1260f, 710f);
+        tutorialImage = imageObject.GetComponent<Image>();
+        tutorialImage.color = Color.white;
+        tutorialImage.preserveAspect = true;
+
+        tutorialTitle = CreateText(panel.transform, "", new Vector2(650f, 355f), new Vector2(720f, 100f), 52, accentColor);
+        tutorialBody = CreateText(panel.transform, "", new Vector2(650f, 250f), new Vector2(720f, 120f), 30, Color.white);
+        tutorialBody.alignment = TextAnchor.UpperCenter;
+
+        tutorialCallouts = new Text[3];
+        tutorialCallouts[0] = CreateTutorialCallout(panel.transform, new Vector2(650f, 100f));
+        tutorialCallouts[1] = CreateTutorialCallout(panel.transform, new Vector2(650f, -35f));
+        tutorialCallouts[2] = CreateTutorialCallout(panel.transform, new Vector2(650f, -170f));
+
+        tutorialPageText = CreateText(panel.transform, "", new Vector2(0f, -405f), new Vector2(250f, 55f), 28, Color.white);
+        tutorialBackButton = CreateButton(panel.transform, "BACK", new Vector2(490f, -360f), PreviousTutorialPage);
+        tutorialNextButton = CreateButton(panel.transform, "NEXT", new Vector2(875f, -360f), NextTutorialPage);
+
+        tutorialSprites = new Sprite[3];
+
+        for (int i = 0; i < tutorialSprites.Length; i++)
+        {
+            Texture2D texture = Resources.Load<Texture2D>($"UI/Tutorial/tutorial_{i + 1}");
+
+            if (texture != null)
+                tutorialSprites[i] = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        tutorialPanel.SetActive(false);
+    }
+
     void CreateTouchControls()
     {
         touchControls = new GameObject("Touch Controls", typeof(RectTransform));
@@ -213,7 +271,8 @@ public class GameFlowController : MonoBehaviour
         VirtualButtonControl crouchControl = CreateVirtualButton("Crouch Control", "<Gamepad>/buttonEast");
         VirtualButtonControl sprintControl = CreateVirtualButton("Sprint Control", "<Gamepad>/leftStickPress");
 
-        CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, crouchControl, null, sprintControl);
+        MobileTouchStick movementStick = CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, crouchControl, null, sprintControl);
+        CreateAutoRunButton(touchControls.transform, movementStick);
         CreateTouchButton(touchControls.transform, "ATTACK", new Vector2(-170f, 190f), "<Gamepad>/buttonWest");
         CreateTouchButton(touchControls.transform, "AIM", new Vector2(-360f, 190f), "<Gamepad>/rightShoulder");
         CreateTouchButton(touchControls.transform, "JUMP", new Vector2(-170f, 380f), "<Gamepad>/buttonSouth");
@@ -234,11 +293,20 @@ public class GameFlowController : MonoBehaviour
         settingsPanel.SetActive(false);
         creditsPanel.SetActive(false);
         gameOverPanel.SetActive(false);
+        tutorialPanel.SetActive(false);
         touchControls.SetActive(Application.isMobilePlatform);
 
         SetGameplayControl(true);
         Cursor.lockState = Application.isMobilePlatform ? CursorLockMode.None : CursorLockMode.Locked;
         Cursor.visible = Application.isMobilePlatform;
+    }
+
+    void PlayFromMenu()
+    {
+        if (sessionStarted)
+            StartGame();
+        else
+            ShowTutorial();
     }
 
     void ShowMainMenu()
@@ -257,6 +325,7 @@ public class GameFlowController : MonoBehaviour
         settingsPanel.SetActive(false);
         creditsPanel.SetActive(false);
         gameOverPanel.SetActive(false);
+        tutorialPanel.SetActive(false);
         touchControls.SetActive(false);
 
         SetGameplayControl(false);
@@ -270,6 +339,7 @@ public class GameFlowController : MonoBehaviour
         mainPanel.SetActive(false);
         settingsPanel.SetActive(true);
         creditsPanel.SetActive(false);
+        tutorialPanel.SetActive(false);
     }
 
     void ShowCredits()
@@ -278,6 +348,90 @@ public class GameFlowController : MonoBehaviour
         mainPanel.SetActive(false);
         settingsPanel.SetActive(false);
         creditsPanel.SetActive(true);
+        tutorialPanel.SetActive(false);
+    }
+
+    void ShowTutorial()
+    {
+        PlayButtonSound();
+        gameRunning = false;
+        Time.timeScale = 0f;
+        tutorialPage = 0;
+
+        mainPanel.SetActive(false);
+        settingsPanel.SetActive(false);
+        creditsPanel.SetActive(false);
+        gameOverPanel.SetActive(false);
+        touchControls.SetActive(false);
+        tutorialPanel.SetActive(true);
+
+        SetGameplayControl(false);
+        UpdateTutorialPage();
+    }
+
+    void PreviousTutorialPage()
+    {
+        PlayButtonSound();
+
+        if (tutorialPage == 0)
+        {
+            ShowMainMenu(false);
+            return;
+        }
+
+        tutorialPage--;
+        UpdateTutorialPage();
+    }
+
+    void NextTutorialPage()
+    {
+        PlayButtonSound();
+
+        if (tutorialPage >= 2)
+        {
+            StartGame();
+            return;
+        }
+
+        tutorialPage++;
+        UpdateTutorialPage();
+    }
+
+    void UpdateTutorialPage()
+    {
+        string[] titles =
+        {
+            "MOVE AND SURVIVE",
+            "THROW THE BOOMERANG",
+            "DEFEND THE TREE"
+        };
+
+        string[] descriptions =
+        {
+            "The entire left half of the screen is your movement area.",
+            "Use the right-side buttons to throw normally or enter precision aim.",
+            "Watch your health, the tree, and the enemies remaining in each wave."
+        };
+
+        string[,] callouts =
+        {
+            { "MOVE STICK\nDrag anywhere on the left side to move and turn.", "AUTO RUN\nTap the visible top-left button to run forward. Tap again to stop.", "JUMP / CROUCH\nTap JUMP. Hold the stick near its centre for two seconds to crouch." },
+            { "ATTACK\nThrows a fast, narrow oval in front of the player.", "AIM\nStops movement and enables precise aiming. Tilt the phone or use the stick.", "CHARGED SHOT\nHold ATTACK while aiming. Release to hit harder and ricochet back." },
+            { "INTERACT\nPick up, drop, repair, or use the object under the crosshair.", "PAUSE\nOpens the main menu without ending the current run.", "SURVIVE A WAVE\nClearing every enemy completes the wave. The next wave begins automatically." }
+        };
+
+        tutorialTitle.text = titles[tutorialPage];
+        tutorialBody.text = descriptions[tutorialPage];
+        tutorialPageText.text = $"{tutorialPage + 1} / 3";
+
+        for (int i = 0; i < tutorialCallouts.Length; i++)
+            tutorialCallouts[i].text = callouts[tutorialPage, i];
+
+        tutorialImage.sprite = tutorialSprites[tutorialPage];
+        tutorialImage.color = tutorialSprites[tutorialPage] == null ? new Color(0.08f, 0.14f, 0.08f, 1f) : Color.white;
+
+        tutorialBackButton.GetComponentInChildren<Text>().text = tutorialPage == 0 ? "MENU" : "BACK";
+        tutorialNextButton.GetComponentInChildren<Text>().text = tutorialPage == 2 ? "START GAME" : "NEXT";
     }
 
     void ShowGameOver()
@@ -286,6 +440,7 @@ public class GameFlowController : MonoBehaviour
         Time.timeScale = 0f;
         SetGameplayControl(false);
         touchControls.SetActive(false);
+        tutorialPanel.SetActive(false);
         gameOverPanel.SetActive(true);
 
         if (failReason != null)
@@ -339,7 +494,7 @@ public class GameFlowController : MonoBehaviour
 
     private void AddSettingSlider(Transform parent, string label, string key, float minimum, float maximum, float fallback, float y)
     {
-        Text text = CreateText(parent, "", new Vector2(0f, y), new Vector2(650f, 40f), 24, Color.white);
+        Text text = CreateText(parent, "", new Vector2(0f, y), new Vector2(650f, 50f), 28, Color.white);
         Slider slider = CreateSlider(parent, new Vector2(0f, y - 40f));
         slider.minValue = minimum;
         slider.maxValue = maximum;
@@ -416,14 +571,34 @@ public class GameFlowController : MonoBehaviour
         rect.sizeDelta = size;
 
         Text text = textObject.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = fontSize >= 36
+            ? boldFont ?? regularFont ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+            : regularFont ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.text = content;
         text.fontSize = fontSize;
         text.color = color;
         text.alignment = TextAnchor.MiddleCenter;
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+
+        Outline outline = textObject.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(2f, -2f);
         return text;
+    }
+
+    Text CreateTutorialCallout(Transform parent, Vector2 position)
+    {
+        GameObject callout = new GameObject("Tutorial Callout", typeof(RectTransform), typeof(Image));
+        callout.transform.SetParent(parent, false);
+        RectTransform rect = callout.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = new Vector2(720f, 115f);
+        callout.GetComponent<Image>().color = new Color(buttonColor.r, buttonColor.g, buttonColor.b, 0.9f);
+        return CreateText(callout.transform, "", Vector2.zero, new Vector2(690f, 105f), 27, Color.white);
     }
 
     Button CreateButton(Transform parent, string label, Vector2 position, UnityEngine.Events.UnityAction action)
@@ -449,7 +624,7 @@ public class GameFlowController : MonoBehaviour
         button.colors = colors;
         button.onClick.AddListener(action);
 
-        CreateText(buttonObject.transform, label, Vector2.zero, new Vector2(420f, 75f), 28, Color.white);
+        CreateText(buttonObject.transform, label, Vector2.zero, new Vector2(420f, 75f), 32, Color.white);
         return button;
     }
 
@@ -518,7 +693,7 @@ public class GameFlowController : MonoBehaviour
         return control;
     }
 
-    void CreateTouchZone(Transform parent, string zoneName, Vector2 anchorMin, Vector2 anchorMax, string controlPath, bool movementZone, VirtualButtonControl holdAction, VirtualButtonControl tapAction, VirtualButtonControl sprintAction)
+    MobileTouchStick CreateTouchZone(Transform parent, string zoneName, Vector2 anchorMin, Vector2 anchorMax, string controlPath, bool movementZone, VirtualButtonControl holdAction, VirtualButtonControl tapAction, VirtualButtonControl sprintAction)
     {
         GameObject zone = new GameObject(zoneName, typeof(RectTransform), typeof(Image), typeof(MobileTouchStick));
         zone.transform.SetParent(parent, false);
@@ -532,6 +707,33 @@ public class GameFlowController : MonoBehaviour
         MobileTouchStick stick = zone.GetComponent<MobileTouchStick>();
         stick.controlPath = controlPath;
         stick.Configure(movementZone, holdAction, tapAction, sprintAction);
+        return stick;
+    }
+
+    void CreateAutoRunButton(Transform parent, MobileTouchStick movementStick)
+    {
+        GameObject buttonObject = new GameObject("Auto Run", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(170f, -105f);
+        rect.sizeDelta = new Vector2(280f, 120f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(accentColor.r, accentColor.g, accentColor.b, 0.88f);
+        Button button = buttonObject.GetComponent<Button>();
+        Text label = CreateText(buttonObject.transform, "AUTO RUN", Vector2.zero, new Vector2(265f, 110f), 30, Color.black);
+        button.onClick.AddListener(movementStick.ToggleAutoRun);
+        movementStick.AutoRunChanged += running =>
+        {
+            label.text = running ? "STOP RUN" : "AUTO RUN";
+            image.color = running
+                ? new Color(0.3f, 0.9f, 0.35f, 0.95f)
+                : new Color(accentColor.r, accentColor.g, accentColor.b, 0.88f);
+        };
     }
 
     void CreateTouchButton(Transform parent, string label, Vector2 position, string controlPath, bool topAnchored = false)
@@ -548,7 +750,7 @@ public class GameFlowController : MonoBehaviour
 
         button.GetComponent<Image>().color = new Color(buttonColor.r, buttonColor.g, buttonColor.b, 0.68f);
         button.GetComponent<OnScreenButton>().controlPath = controlPath;
-        CreateText(button.transform, label, Vector2.zero, new Vector2(132f, 132f), 19, Color.white);
+        CreateText(button.transform, label, Vector2.zero, new Vector2(132f, 132f), 25, Color.white);
     }
 
     void Stretch(RectTransform rect)

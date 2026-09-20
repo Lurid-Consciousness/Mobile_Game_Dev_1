@@ -8,8 +8,9 @@ public class CameraController : MonoBehaviour
 
     public float mouseSensitivity = 15f;
     public float controllerSensitivity = 120f;
+    public float gyroSensitivity = 1.2f;
     public float distanceFromPlayer = 5f;
-    public float playerHeight = 2f;
+    public float playerHeight = 1.6f;
     public float shoulderDistance = 1.2f;
     public float shoulderSpeed = 8f;
     public float followSpeed = 12f;
@@ -23,6 +24,7 @@ public class CameraController : MonoBehaviour
     private float shoulderSide = 1f;
     private float currentShoulderDistance;
     private int ignoreLookFrames;
+    private UnityEngine.InputSystem.Gyroscope gyroscope;
 
     void Awake()
     {
@@ -41,6 +43,13 @@ public class CameraController : MonoBehaviour
         previousAction?.Enable();
         nextAction?.Enable();
         ignoreLookFrames = 2;
+
+        if (Application.isMobilePlatform && UnityEngine.InputSystem.Gyroscope.current != null)
+        {
+            gyroscope = UnityEngine.InputSystem.Gyroscope.current;
+            InputSystem.settings.compensateForScreenOrientation = true;
+            InputSystem.EnableDevice(gyroscope);
+        }
     }
 
     void OnDisable()
@@ -48,6 +57,9 @@ public class CameraController : MonoBehaviour
         lookAction.action.Disable();
         previousAction?.Disable();
         nextAction?.Disable();
+
+        if (gyroscope != null)
+            InputSystem.DisableDevice(gyroscope);
     }
 
     void OnApplicationFocus(bool focused)
@@ -106,6 +118,14 @@ public class CameraController : MonoBehaviour
             aimInput = playerController.AimInput;
             cameraYaw += aimInput.x * controllerSensitivity * Time.deltaTime;
             cameraPitch -= aimInput.y * controllerSensitivity * Time.deltaTime;
+
+            if (gyroscope != null && gyroscope.enabled)
+            {
+                Vector3 angularVelocity = gyroscope.angularVelocity.ReadValue();
+                float gyroScale = Mathf.Rad2Deg * gyroSensitivity * PlayerPrefs.GetFloat("LookSensitivity", 1f) * Time.deltaTime;
+                cameraYaw -= angularVelocity.y * gyroScale;
+                cameraPitch += angularVelocity.x * gyroScale;
+            }
         }
         else
         {
