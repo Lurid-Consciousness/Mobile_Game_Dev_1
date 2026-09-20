@@ -14,7 +14,9 @@ public class PlayerController : MonoBehaviour
 
     public float moveSpeed = 5f;
     public float sprintSpeed = 8f;
+    public float crouchSpeed = 2.5f;
     public float jumpForce = 6f;
+    public float crouchHeight = 1f;
     public float interactRange = 2f;
     public float throwForce = 10f;
     public float maxHealth = 100f;
@@ -32,10 +34,14 @@ public class PlayerController : MonoBehaviour
     private Collider[] heldColliders;
     private Vector2 moveInput;
     private InputAction jumpAction;
+    private InputAction crouchAction;
     private InputAction curveAction;
     private InputAction sprintAction;
+    private float standingHeight;
+    private Vector3 standingCenter;
     private float currentHealth;
     private bool jumpRequested;
+    private bool isCrouching;
     private bool isChargingBoomerang;
     private float slowMultiplier = 1f;
     private float slowTimer;
@@ -55,9 +61,12 @@ public class PlayerController : MonoBehaviour
         playerCollider = GetComponent<CapsuleCollider>();
 
         jumpAction = moveAction.action.actionMap.FindAction("Jump");
+        crouchAction = moveAction.action.actionMap.FindAction("Crouch");
         curveAction = moveAction.action.actionMap.FindAction("Curve");
         sprintAction = moveAction.action.actionMap.FindAction("Sprint");
 
+        standingHeight = playerCollider.height;
+        standingCenter = playerCollider.center;
         currentHealth = maxHealth;
 
         if (boomerang != null)
@@ -69,6 +78,7 @@ public class PlayerController : MonoBehaviour
         moveAction.action.Enable();
         interactAction.action.Enable();
         jumpAction.Enable();
+        crouchAction?.Enable();
         curveAction?.Enable();
         sprintAction.Enable();
 
@@ -88,6 +98,7 @@ public class PlayerController : MonoBehaviour
         moveAction.action.Disable();
         interactAction.action.Disable();
         jumpAction.Disable();
+        crouchAction?.Disable();
         curveAction?.Disable();
         sprintAction.Disable();
 
@@ -105,6 +116,7 @@ public class PlayerController : MonoBehaviour
             slowMultiplier = 1f;
 
         moveInput = moveAction.action.ReadValue<Vector2>();
+        SetCrouching(crouchAction != null && crouchAction.IsPressed());
 
         if (boomerang != null && curveAction != null && boomerang.IsReady)
         {
@@ -195,7 +207,9 @@ public class PlayerController : MonoBehaviour
 
         float currentSpeed = moveSpeed;
 
-        if (powerups != null && powerups.CanSprint && sprintAction.IsPressed())
+        if (isCrouching)
+            currentSpeed = crouchSpeed;
+        else if (powerups != null && powerups.CanSprint && sprintAction.IsPressed())
             currentSpeed = sprintSpeed;
 
         currentSpeed *= slowMultiplier;
@@ -214,6 +228,28 @@ public class PlayerController : MonoBehaviour
         {
             heldObject.MovePosition(interactPoint.position);
             heldObject.MoveRotation(interactPoint.rotation);
+        }
+    }
+
+    void SetCrouching(bool crouching)
+    {
+        if (isCrouching == crouching)
+            return;
+
+        isCrouching = crouching;
+
+        if (isCrouching)
+        {
+            float newHeight = Mathf.Max(crouchHeight, playerCollider.radius * 2f);
+            float heightDifference = standingHeight - newHeight;
+
+            playerCollider.height = newHeight;
+            playerCollider.center = standingCenter - Vector3.up * heightDifference * 0.5f;
+        }
+        else
+        {
+            playerCollider.height = standingHeight;
+            playerCollider.center = standingCenter;
         }
     }
 

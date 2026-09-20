@@ -212,10 +212,11 @@ public class GameFlowController : MonoBehaviour
         Stretch(touchControls.GetComponent<RectTransform>());
 
         VirtualButtonControl jumpControl = CreateVirtualButton("Jump Control", "<Gamepad>/buttonSouth");
+        VirtualButtonControl crouchControl = CreateVirtualButton("Crouch Control", "<Gamepad>/buttonEast");
         VirtualButtonControl attackControl = CreateVirtualButton("Attack Control", "<Gamepad>/buttonWest");
         VirtualButtonControl sprintControl = CreateVirtualButton("Sprint Control", "<Gamepad>/leftStickPress");
 
-        CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, null, jumpControl, sprintControl);
+        CreateTouchZone(touchControls.transform, "Movement Zone", new Vector2(0f, 0f), new Vector2(0.5f, 1f), "<Gamepad>/leftStick", true, crouchControl, jumpControl, sprintControl);
         CreateTouchZone(touchControls.transform, "Camera Zone", new Vector2(0.5f, 0f), new Vector2(1f, 1f), "<Gamepad>/rightStick", false, attackControl, null, null);
         CreateTouchButton(touchControls.transform, "INTERACT", new Vector2(-560f, 430f), "<Gamepad>/buttonNorth");
 
