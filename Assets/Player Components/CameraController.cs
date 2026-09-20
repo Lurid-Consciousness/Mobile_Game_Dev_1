@@ -13,6 +13,7 @@ public class CameraController : MonoBehaviour
     public float playerHeight = 2f;
     public float shoulderDistance = 1.2f;
     public float shoulderSpeed = 8f;
+    public float controllerSensitivity = 120f;
 
     private float mouseX;
     private float mouseY;
@@ -60,8 +61,10 @@ public class CameraController : MonoBehaviour
         if (nextAction.WasPressedThisFrame())
             shoulderSide = 1f;
 
-        mouseX += lookInput.x * mouseSensitivity * Time.deltaTime;
-        mouseY -= lookInput.y * mouseSensitivity * Time.deltaTime;
+        float currentSensitivity = lookAction.action.activeControl != null && lookAction.action.activeControl.device is Gamepad ? controllerSensitivity : mouseSensitivity;
+
+        mouseX += lookInput.x * currentSensitivity * Time.deltaTime;
+        mouseY -= lookInput.y * currentSensitivity * Time.deltaTime;
 
         mouseY = Mathf.Clamp(mouseY, -20f, 60f);
 

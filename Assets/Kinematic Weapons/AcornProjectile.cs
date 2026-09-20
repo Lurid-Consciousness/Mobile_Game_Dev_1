@@ -34,6 +34,7 @@ public class AcornProjectile : MonoBehaviour
         rb.isKinematic = true;
         rb.useGravity = false;
         isMoving = true;
+        GameAudio.PlayThrow();
     }
 
     private void FixedUpdate()

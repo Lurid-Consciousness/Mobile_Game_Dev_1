@@ -234,6 +234,7 @@ public class PlayerController : MonoBehaviour
     {
         currentHealth -= damage;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        GameAudio.PlayHit();
     }
 
     public void Heal(float amount)
@@ -321,6 +322,9 @@ public class PlayerController : MonoBehaviour
         if (acornProjectile != null)
             acornProjectile.Launch(cameraTransform.forward);
         else
+        {
             thrownObject.AddForce(cameraTransform.forward * throwForce, ForceMode.Impulse);
+            GameAudio.PlayThrow();
+        }
     }
 }

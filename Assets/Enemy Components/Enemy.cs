@@ -17,6 +17,7 @@ public class Enemy : MonoBehaviour
     public void TakeDamage(float damageAmount)
     {
         currentHealth -= damageAmount;
+        GameAudio.PlayHit();
 
         Renderer enemyRenderer = GetComponent<Renderer>();
 

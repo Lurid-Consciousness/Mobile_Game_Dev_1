@@ -191,6 +191,8 @@ public class BoomerangProjectile : MonoBehaviour
         if (!IsReady || isPocketed)
             return;
 
+        GameAudio.PlayThrow();
+
         startPosition = rb.position;
         launchDirection = direction.normalized;
         ChargeAmount = Mathf.Clamp01(chargeAmount);

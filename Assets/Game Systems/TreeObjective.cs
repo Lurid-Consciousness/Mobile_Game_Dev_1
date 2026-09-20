@@ -48,6 +48,7 @@ public class TreeObjective : MonoBehaviour
     {
         currentHealth -= damage;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        GameAudio.PlayHit();
 
         if (treeRenderer != null)
             treeRenderer.material.color = Color.Lerp(Color.red, Color.green, HealthPercent);

@@ -248,7 +248,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
   maxHealth: 30
-  damage: 5
+  damage: 3
 --- !u!1 &210000007
 GameObject:
   m_ObjectHideFlags: 0
@@ -694,7 +694,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4a1a7ef18f18408bad89b5613373c32e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TreeObjective
-  maxHealth: 300
+  maxHealth: 500
   acornTemplate: {fileID: 946355088}
   acornDropHeight: 4
   acornDropRadius: 2.5
@@ -1623,6 +1623,7 @@ MonoBehaviour:
   playerHeight: 2
   shoulderDistance: 1.2
   shoulderSpeed: 8
+  controllerSensitivity: 120
 --- !u!1 &1880565746
 GameObject:
   m_ObjectHideFlags: 0
