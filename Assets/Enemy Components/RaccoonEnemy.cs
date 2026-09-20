@@ -65,6 +65,19 @@ public class RaccoonEnemy : MonoBehaviour
         Vector3 targetPosition = playerIsBlocking ? playerPosition : treePosition;
         float targetDistance = Vector3.Distance(transform.position, targetPosition);
 
+        Defence barrier = Defence.FindBlocking(transform.position, targetPosition, attackDistance + moveSpeed * Time.deltaTime);
+        if (barrier != null)
+        {
+            transform.LookAt(FlatPosition(barrier.transform.position));
+            if (attackTimer <= 0f)
+            {
+                barrier.TakeDamage(enemy.damage);
+                enemy.ShowAttack();
+                attackTimer = attackDelay;
+            }
+            return;
+        }
+
         if (targetDistance > attackDistance)
         {
             MoveTo(targetPosition);
@@ -77,6 +90,8 @@ public class RaccoonEnemy : MonoBehaviour
                     player.TakeDamage(enemy.damage);
                 else
                     tree.TakeDamage(enemy.damage);
+
+                enemy.ShowAttack();
 
                 attackTimer = attackDelay;
             }

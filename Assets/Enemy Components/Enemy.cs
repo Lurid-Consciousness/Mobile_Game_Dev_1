@@ -6,17 +6,26 @@ public class Enemy : MonoBehaviour
     public float damage = 10f;
 
     private float currentHealth;
+    private WoodlandMotion motion;
 
     public float HealthPercent => currentHealth / maxHealth;
 
     void Awake()
     {
         currentHealth = maxHealth;
+        motion = GetComponentInChildren<WoodlandMotion>();
+    }
+
+    public void ShowAttack()
+    {
+        if (motion != null)
+            motion.Attack();
     }
 
     public void TakeDamage(float damageAmount)
     {
         currentHealth -= damageAmount;
+        GameAudio.PlayHit();
 
         Renderer enemyRenderer = GetComponent<Renderer>();
 

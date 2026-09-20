@@ -26,6 +26,10 @@ public class EnemyProjectile : MonoBehaviour
         if (player != null)
             player.TakeDamage(damage);
 
+        Defence barrier = collision.collider.GetComponentInParent<Defence>();
+        if (barrier != null)
+            barrier.TakeDamage(damage);
+
         Destroy(gameObject);
     }
 }

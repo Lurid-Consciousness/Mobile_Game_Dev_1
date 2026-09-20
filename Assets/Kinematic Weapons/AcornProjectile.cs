@@ -34,6 +34,7 @@ public class AcornProjectile : MonoBehaviour
         rb.isKinematic = true;
         rb.useGravity = false;
         isMoving = true;
+        GameAudio.PlayThrow();
     }
 
     private void FixedUpdate()
@@ -87,9 +88,18 @@ public class AcornProjectile : MonoBehaviour
             return;
 
         Enemy enemy = hitCollider.GetComponentInParent<Enemy>();
+        Defence barrier = hitCollider.GetComponentInParent<Defence>();
+        if (barrier != null)
+        {
+            barrier.TakeDamage(damage);
+            isMoving = false;
+            Destroy(gameObject);
+            return;
+        }
 
         if (enemy != null)
         {
+            isMoving = false;
             enemy.TakeDamage(damage);
             Destroy(gameObject);
             return;

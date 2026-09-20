@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(BoxCollider))]
@@ -19,6 +20,7 @@ public class BoomerangProjectile : MonoBehaviour
 
     public float ChargeAmount { get; private set; }
     public bool IsReady { get; private set; }
+    public float CurveAngle { get; private set; }
 
     private Rigidbody rb;
     private LineRenderer lineRenderer;
@@ -34,6 +36,18 @@ public class BoomerangProjectile : MonoBehaviour
     private bool isPocketed;
     private Enemy lastEnemyHit;
     private float castRadius = 0.1f;
+    [SerializeField] private float lockFlightSpeed = 25f;
+    private float launchedCurveAngle;
+    private readonly List<Enemy> flightTargets = new List<Enemy>();
+    private readonly HashSet<Enemy> hitEnemies = new HashSet<Enemy>();
+    private int targetIndex;
+    private bool lockFlight;
+    private float lockFlightTimer;
+
+    public void AdjustCurve(float amount)
+    {
+        CurveAngle = Mathf.Clamp(CurveAngle + amount, -90f, 90f);
+    }
 
     void Awake()
     {
@@ -85,6 +99,11 @@ public class BoomerangProjectile : MonoBehaviour
             return;
         }
 
+        if (lockFlight)
+        {
+            FlyToTargets();
+            return;
+        }
         flightProgress += Time.fixedDeltaTime / flightTime;
 
         float progress = Mathf.Clamp01(flightProgress);
@@ -99,7 +118,7 @@ public class BoomerangProjectile : MonoBehaviour
 
             if (enemy != null)
             {
-                if (enemy != lastEnemyHit)
+                if (hitEnemies.Add(enemy))
                 {
                     enemy.TakeDamage(damage);
                     lastEnemyHit = enemy;
@@ -107,6 +126,9 @@ public class BoomerangProjectile : MonoBehaviour
             }
             else
             {
+                Defence barrier = hit.collider.GetComponentInParent<Defence>();
+                if (barrier != null)
+                    barrier.TakeDamage(damage);
                 FinishFlight();
                 return;
             }
@@ -164,8 +186,18 @@ public class BoomerangProjectile : MonoBehaviour
         ChargeAmount = Mathf.Clamp01(ChargeAmount);
     }
 
-    public void ShowPath(Vector3 pathStart, Vector3 direction)
+    public void ShowPath(Vector3 pathStart, Vector3 direction, List<Enemy> targets = null)
     {
+        if (targets != null && targets.Count > 0)
+        {
+            lineRenderer.enabled = true;
+            lineRenderer.positionCount = targets.Count + 2;
+            lineRenderer.SetPosition(0, pathStart);
+            for (int i = 0; i < targets.Count; i++)
+                lineRenderer.SetPosition(i + 1, targets[i] != null ? targets[i].transform.position : pathStart);
+            lineRenderer.SetPosition(targets.Count + 1, pathStart);
+            return;
+        }
         int pointCount = Mathf.Max(2, pathPoints);
         Vector3 normalizedDirection = direction.normalized;
 
@@ -186,10 +218,12 @@ public class BoomerangProjectile : MonoBehaviour
         lineRenderer.positionCount = 0;
     }
 
-    public void Launch(Vector3 direction, float chargeAmount)
+    public void Launch(Vector3 direction, float chargeAmount, List<Enemy> targets = null)
     {
         if (!IsReady || isPocketed)
             return;
+
+        GameAudio.PlayThrow();
 
         startPosition = rb.position;
         launchDirection = direction.normalized;
@@ -199,6 +233,18 @@ public class BoomerangProjectile : MonoBehaviour
         isFlying = true;
         IsReady = false;
         lastEnemyHit = null;
+        hitEnemies.Clear();
+        launchedCurveAngle = CurveAngle;
+        flightTargets.Clear();
+        if (targets != null)
+        {
+            foreach (Enemy enemy in targets)
+                if (enemy != null && enemy.HealthPercent > 0f && !flightTargets.Contains(enemy) && flightTargets.Count < 4)
+                    flightTargets.Add(enemy);
+        }
+        targetIndex = 0;
+        lockFlight = flightTargets.Count > 0;
+        lockFlightTimer = 0f;
 
         HidePath();
         SetVisible(true);
@@ -221,10 +267,15 @@ public class BoomerangProjectile : MonoBehaviour
         float sidewaysDistance = Mathf.Sin(progress * Mathf.PI * 2f);
 
         Vector3 sideDirection = Vector3.Cross(Vector3.up, direction).normalized;
+        if (sideDirection.sqrMagnitude < 0.01f)
+            sideDirection = Vector3.right;
+        Quaternion curveRotation = Quaternion.AngleAxis(isFlying ? launchedCurveAngle : CurveAngle, direction);
+        Vector3 arcDirection = curveRotation * Vector3.Cross(direction, sideDirection).normalized;
+        sideDirection = curveRotation * sideDirection;
 
         Vector3 position = origin;
         position += direction * distance * outwardDistance;
-        position += Vector3.up * arcHeight * outwardDistance;
+        position += arcDirection * arcHeight * outwardDistance;
         position += sideDirection * curveAmount * sidewaysDistance;
 
         if (progress > 0.5f)
@@ -243,7 +294,7 @@ public class BoomerangProjectile : MonoBehaviour
 
         Enemy enemy = collision.collider.GetComponentInParent<Enemy>();
 
-        if (enemy != null && enemy != lastEnemyHit)
+        if (enemy != null && hitEnemies.Add(enemy))
         {
             enemy.TakeDamage(damage);
             lastEnemyHit = enemy;
@@ -260,6 +311,9 @@ public class BoomerangProjectile : MonoBehaviour
         foreach (RaycastHit hit in hits)
         {
             if (hit.collider.transform.IsChildOf(transform))
+                continue;
+            Enemy enemy = hit.collider.GetComponentInParent<Enemy>();
+            if (enemy != null && hitEnemies.Contains(enemy))
                 continue;
 
             bool belongsToOwner = false;
@@ -286,19 +340,59 @@ public class BoomerangProjectile : MonoBehaviour
 
     void FinishFlight()
     {
+        lockFlight = false;
+        flightTargets.Clear();
         isFlying = false;
         IsReady = true;
         ChargeAmount = 0f;
 
         rb.isKinematic = true;
         rb.useGravity = false;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
         SetColliders(false);
         SetVisible(!isPocketed);
 
         if (returnPoint != null)
             rb.position = returnPoint.position;
+    }
+
+    private void FlyToTargets()
+    {
+        lockFlightTimer += Time.fixedDeltaTime;
+        while (targetIndex < flightTargets.Count &&
+               (flightTargets[targetIndex] == null || flightTargets[targetIndex].HealthPercent <= 0f || hitEnemies.Contains(flightTargets[targetIndex])))
+            targetIndex++;
+        if (lockFlightTimer > 8f)
+            targetIndex = flightTargets.Count;
+        bool returning = targetIndex >= flightTargets.Count;
+        Vector3 target = returning ? (returnPoint != null ? returnPoint.position : startPosition) : flightTargets[targetIndex].transform.position;
+        Vector3 next = Vector3.MoveTowards(rb.position, target, lockFlightSpeed * Time.fixedDeltaTime);
+        Vector3 movement = next - rb.position;
+        if (!returning && movement.sqrMagnitude > 0f && FindHit(movement, out RaycastHit hit))
+        {
+            Enemy enemy = hit.collider.GetComponentInParent<Enemy>();
+            if (enemy != null)
+            {
+                if (hitEnemies.Add(enemy))
+                    enemy.TakeDamage(damage);
+            }
+            else
+            {
+                Defence barrier = hit.collider.GetComponentInParent<Defence>();
+                if (barrier != null)
+                    barrier.TakeDamage(damage);
+                targetIndex = flightTargets.Count;
+                next = rb.position;
+            }
+        }
+        rb.MovePosition(next);
+        rb.MoveRotation(rb.rotation * Quaternion.AngleAxis(spinSpeed * Time.fixedDeltaTime, Vector3.up));
+        if (Vector3.Distance(next, target) < 0.1f)
+        {
+            if (returning)
+                FinishFlight();
+            else
+                targetIndex++;
+        }
     }
 
     void SetColliders(bool value)

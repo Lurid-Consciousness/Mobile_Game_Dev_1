@@ -2,15 +2,31 @@ using UnityEngine;
 
 public class AcornCollectible : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    [SerializeField] private int value = 10;
+    private Rigidbody rb;
+    private bool collected;
+    private float readyTime;
+
+    void Awake()
     {
-        
+        rb = GetComponent<Rigidbody>();
+        readyTime = Time.time + 1f;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void OnTriggerStay(Collider other)
     {
-        
+        PlayerController player = other.GetComponentInParent<PlayerController>();
+        if (collected || Time.time < readyTime || rb == null || rb.isKinematic
+            || player == null || !player.enabled || !player.IsAlive || player.IsGliding)
+            return;
+
+        AcornWallet wallet = player.GetComponent<AcornWallet>();
+        if (wallet == null)
+            return;
+
+        collected = true;
+        wallet.Collect(value);
+        GameAudio.PlayButton();
+        Destroy(gameObject);
     }
 }

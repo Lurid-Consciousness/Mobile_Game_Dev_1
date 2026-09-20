@@ -13,6 +13,7 @@ public class CameraController : MonoBehaviour
     public float playerHeight = 2f;
     public float shoulderDistance = 1.2f;
     public float shoulderSpeed = 8f;
+    public float controllerSensitivity = 120f;
 
     private float mouseX;
     private float mouseY;
@@ -20,15 +21,14 @@ public class CameraController : MonoBehaviour
     private float currentShoulderDistance;
     private InputAction previousAction;
     private InputAction nextAction;
+    private int ignoreLookFrames;
 
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        mouseX = transform.eulerAngles.y;
+        mouseY = Mathf.DeltaAngle(0f, transform.eulerAngles.x);
         currentShoulderDistance = shoulderDistance;
-
     }
 
     private void OnEnable()
@@ -39,6 +39,7 @@ public class CameraController : MonoBehaviour
         lookAction.action.Enable();
         previousAction.Enable();
         nextAction.Enable();
+        ignoreLookFrames = 2;
     }
 
     private void OnDisable()
@@ -48,9 +49,15 @@ public class CameraController : MonoBehaviour
         nextAction.Disable();
     }
 
-    // Update is called once per frame
+    private void OnApplicationFocus(bool focused)
+    {
+        ignoreLookFrames = 2;
+    }
+
     void LateUpdate()
     {
+        if (Time.timeScale == 0f || !Application.isFocused || playerTransform == null)
+            return;
 
         Vector2 lookInput = lookAction.action.ReadValue<Vector2>();
 
@@ -60,8 +67,16 @@ public class CameraController : MonoBehaviour
         if (nextAction.WasPressedThisFrame())
             shoulderSide = 1f;
 
-        mouseX += lookInput.x * mouseSensitivity * Time.deltaTime;
-        mouseY -= lookInput.y * mouseSensitivity * Time.deltaTime;
+        if (ignoreLookFrames > 0)
+        {
+            lookInput = Vector2.zero;
+            ignoreLookFrames--;
+        }
+        bool usingGamepad = lookAction.action.activeControl != null && lookAction.action.activeControl.device is Gamepad;
+        float sensitivity = usingGamepad ? controllerSensitivity * Time.deltaTime : mouseSensitivity / 60f;
+        sensitivity *= PlayerPrefs.GetFloat("LookSensitivity", 1f);
+        mouseX = Mathf.Repeat(mouseX + lookInput.x * sensitivity, 360f);
+        mouseY += lookInput.y * sensitivity * (PlayerPrefs.GetInt("InvertY", 0) == 1 ? 1f : -1f);
 
         mouseY = Mathf.Clamp(mouseY, -20f, 60f);
 
@@ -75,7 +90,7 @@ public class CameraController : MonoBehaviour
         cameraPosition += shoulderOffset;
 
         transform.position = cameraPosition;
-        transform.LookAt(playerTransform.position + Vector3.up + shoulderOffset);
+        transform.rotation = cameraRotation;
 
     }
 }

@@ -35,7 +35,9 @@ public class FlyingEnemy : MonoBehaviour
         Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * orbitRadius;
         Vector3 targetPosition = player.transform.position + offset + Vector3.up * height;
         transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
-        transform.LookAt(player.transform.position + Vector3.up);
+        Vector3 lookPosition = player.transform.position;
+        lookPosition.y = transform.position.y;
+        transform.LookAt(lookPosition);
 
         attackTimer -= Time.deltaTime;
 
@@ -48,6 +50,7 @@ public class FlyingEnemy : MonoBehaviour
 
     void Shoot()
     {
+        enemy.ShowAttack();
         int choice = Random.Range(0, 3);
         PrimitiveType shape = choice == 0 ? PrimitiveType.Sphere : choice == 1 ? PrimitiveType.Cube : PrimitiveType.Capsule;
         GameObject projectileObject = GameObject.CreatePrimitive(shape);

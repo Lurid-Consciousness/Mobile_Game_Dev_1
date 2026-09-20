@@ -14,20 +14,16 @@ public class PlayerController : MonoBehaviour
 
     public float moveSpeed = 5f;
     public float sprintSpeed = 8f;
-    public float crouchSpeed = 2.5f;
     public float jumpForce = 6f;
-    public float crouchHeight = 1f;
     public float interactRange = 2f;
     public float throwForce = 10f;
     public float maxHealth = 100f;
-    public float maxStamina = 100f;
-    public float chargeStaminaPerSecond = 30f;
-    public float staminaRecoveryPerSecond = 20f;
 
     public float HealthPercent => currentHealth / maxHealth;
-    public float StaminaPercent => currentStamina / maxStamina;
     public bool IsAlive => currentHealth > 0f;
     public bool CanPickup { get; private set; }
+    public bool IsGliding { get; private set; }
+    public Defence TargetDefence { get; private set; }
     public string ButtonPrompt => interactAction.action.GetBindingDisplayString();
 
     private Rigidbody rb;
@@ -36,31 +32,33 @@ public class PlayerController : MonoBehaviour
     private Collider[] heldColliders;
     private Vector2 moveInput;
     private InputAction jumpAction;
-    private InputAction crouchAction;
+    private InputAction curveAction;
     private InputAction sprintAction;
-    private float standingHeight;
-    private Vector3 standingCenter;
     private float currentHealth;
-    private float currentStamina;
     private bool jumpRequested;
-    private bool isCrouching;
     private bool isChargingBoomerang;
     private float slowMultiplier = 1f;
     private float slowTimer;
+    private GliderLaunchPad launchPad;
+    private AcornWallet wallet;
+    private WoodlandMotion motion;
+    private PlayerPowerups powerups;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        powerups = GetComponent<PlayerPowerups>();
+        launchPad = FindAnyObjectByType<GliderLaunchPad>();
+        wallet = GetComponent<AcornWallet>();
+        motion = GetComponentInChildren<WoodlandMotion>();
         playerCollider = GetComponent<CapsuleCollider>();
 
         jumpAction = moveAction.action.actionMap.FindAction("Jump");
-        crouchAction = moveAction.action.actionMap.FindAction("Crouch");
+        curveAction = moveAction.action.actionMap.FindAction("Curve");
         sprintAction = moveAction.action.actionMap.FindAction("Sprint");
 
-        standingHeight = playerCollider.height;
-        standingCenter = playerCollider.center;
         currentHealth = maxHealth;
-        currentStamina = maxStamina;
 
         if (boomerang != null)
             boomerang.SetOwner(interactPoint, rb.GetComponentsInChildren<Collider>());
@@ -71,7 +69,7 @@ public class PlayerController : MonoBehaviour
         moveAction.action.Enable();
         interactAction.action.Enable();
         jumpAction.Enable();
-        crouchAction.Enable();
+        curveAction?.Enable();
         sprintAction.Enable();
 
         if (throwAction != null)
@@ -80,10 +78,17 @@ public class PlayerController : MonoBehaviour
 
     private void OnDisable()
     {
+        isChargingBoomerang = false;
+        moveInput = Vector2.zero;
+        jumpRequested = false;
+        if (boomerang != null)
+            boomerang.CancelCharge();
+        if (powerups != null)
+            powerups.ClearTargets();
         moveAction.action.Disable();
         interactAction.action.Disable();
         jumpAction.Disable();
-        crouchAction.Disable();
+        curveAction?.Disable();
         sprintAction.Disable();
 
         if (throwAction != null)
@@ -91,6 +96,9 @@ public class PlayerController : MonoBehaviour
     }
     void Update()
     {
+        if (IsGliding)
+            return;
+
         slowTimer -= Time.deltaTime;
 
         if (slowTimer <= 0f)
@@ -98,19 +106,34 @@ public class PlayerController : MonoBehaviour
 
         moveInput = moveAction.action.ReadValue<Vector2>();
 
-        SetCrouching(crouchAction.IsPressed());
+        if (boomerang != null && curveAction != null && boomerang.IsReady)
+        {
+            float scroll = curveAction.ReadValue<float>();
+            if (Mathf.Abs(scroll) > 0.01f)
+                boomerang.AdjustCurve(Mathf.Sign(scroll) * PlayerPrefs.GetFloat("CurveStep", 15f));
+        }
 
         if (jumpAction.WasPressedThisFrame() && IsGrounded())
             jumpRequested = true;
 
-        bool usedStamina = false;
+        TargetDefence = null;
+        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit interactionHit, interactRange, ~0, QueryTriggerInteraction.Collide))
+        {
+            Defence barrier = interactionHit.collider.GetComponentInParent<Defence>();
+            if (barrier != null && Vector3.Distance(transform.position, interactionHit.collider.ClosestPoint(transform.position)) <= 3.5f)
+                TargetDefence = barrier;
+        }
 
         if (interactAction.action.WasPressedThisFrame())
         {
-            if (heldObject == null)
-                Pickup();
-            else
+            if (TargetDefence != null && TargetDefence.NeedsRepair)
+                TargetDefence.TryRepair(wallet);
+            else if (heldObject != null)
                 Drop();
+            else if (launchPad != null && launchPad.TryUse(this))
+                return;
+            else
+                Pickup();
         }
 
         if (throwAction != null && heldObject != null)
@@ -123,42 +146,38 @@ public class PlayerController : MonoBehaviour
             if (throwAction.action.WasPressedThisFrame() && boomerang.IsReady)
             {
                 boomerang.BeginCharge();
+                if (powerups != null)
+                    powerups.ClearTargets();
                 isChargingBoomerang = true;
             }
 
             if (isChargingBoomerang && throwAction.action.IsPressed())
             {
-                float chargeDelta = Time.deltaTime;
-
-                if (chargeStaminaPerSecond > 0f)
-                    chargeDelta = Mathf.Min(chargeDelta, currentStamina / chargeStaminaPerSecond);
-
-                if (chargeDelta > 0f)
-                {
-                    boomerang.Charge(chargeDelta);
-                    currentStamina -= chargeStaminaPerSecond * chargeDelta;
-                    currentStamina = Mathf.Max(0f, currentStamina);
-                    usedStamina = true;
-                }
-
-                boomerang.ShowPath(interactPoint.position, cameraTransform.forward);
+                boomerang.Charge(Time.deltaTime);
+                if (powerups != null)
+                    powerups.UpdateTargets(cameraTransform, boomerang.ChargeAmount);
+                boomerang.ShowPath(interactPoint.position, cameraTransform.forward, powerups != null ? powerups.Targets : null);
             }
 
             if (isChargingBoomerang && throwAction.action.WasReleasedThisFrame())
             {
-                boomerang.Launch(cameraTransform.forward, boomerang.ChargeAmount);
+                boomerang.Launch(cameraTransform.forward, boomerang.ChargeAmount, powerups != null ? powerups.Targets : null);
+                if (powerups != null)
+                    powerups.ClearTargets();
+                if (motion != null)
+                    motion.Attack();
                 isChargingBoomerang = false;
             }
         }
-
-        if (!usedStamina)
-            currentStamina = Mathf.MoveTowards(currentStamina, maxStamina, staminaRecoveryPerSecond * Time.deltaTime);
 
         CanPickup = heldObject == null && FindPickup() != null;
     }
 
     void FixedUpdate()
     {
+        if (IsGliding)
+            return;
+
         Quaternion playerRotation = Quaternion.Euler(0f, cameraTransform.eulerAngles.y, 0f);
         rb.MoveRotation(playerRotation);
 
@@ -176,9 +195,7 @@ public class PlayerController : MonoBehaviour
 
         float currentSpeed = moveSpeed;
 
-        if (isCrouching)
-            currentSpeed = crouchSpeed;
-        else if (sprintAction.IsPressed())
+        if (powerups != null && powerups.CanSprint && sprintAction.IsPressed())
             currentSpeed = sprintSpeed;
 
         currentSpeed *= slowMultiplier;
@@ -200,28 +217,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void SetCrouching(bool crouching)
-    {
-        if (isCrouching == crouching)
-            return;
-
-        isCrouching = crouching;
-
-        if (isCrouching)
-        {
-            float newHeight = Mathf.Max(crouchHeight, playerCollider.radius * 2f);
-            float heightDifference = standingHeight - newHeight;
-
-            playerCollider.height = newHeight;
-            playerCollider.center = standingCenter - Vector3.up * heightDifference * 0.5f;
-        }
-        else
-        {
-            playerCollider.height = standingHeight;
-            playerCollider.center = standingCenter;
-        }
-    }
-
     bool IsGrounded()
     {
         Vector3 rayStart = transform.TransformPoint(playerCollider.center);
@@ -234,6 +229,7 @@ public class PlayerController : MonoBehaviour
     {
         currentHealth -= damage;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        GameAudio.PlayHit();
     }
 
     public void Heal(float amount)
@@ -250,15 +246,35 @@ public class PlayerController : MonoBehaviour
 
     Rigidbody FindPickup()
     {
-        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit hit, interactRange))
+        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit hit, interactRange, ~0, QueryTriggerInteraction.Ignore))
         {
             Rigidbody objectRb = hit.collider.attachedRigidbody;
 
-            if (objectRb != null && objectRb != rb && objectRb.GetComponent<BoomerangProjectile>() == null && objectRb.GetComponent<EnemyProjectile>() == null)
+            if (objectRb != null && objectRb != rb && objectRb.GetComponent<GliderController>() == null && objectRb.GetComponent<BoomerangProjectile>() == null && objectRb.GetComponent<EnemyProjectile>() == null)
 
                 return objectRb;
         }
         return null;
+    }
+
+    public void SetGliding(bool gliding)
+    {
+        if (gliding && heldObject != null)
+            Drop();
+
+        IsGliding = gliding;
+        TargetDefence = null;
+        CanPickup = false;
+        jumpRequested = false;
+        isChargingBoomerang = false;
+        if (powerups != null)
+            powerups.ClearTargets();
+
+        if (boomerang != null)
+        {
+            boomerang.CancelCharge();
+            boomerang.SetPocketed(gliding);
+        }
     }
 
     void Pickup()
@@ -313,6 +329,8 @@ public class PlayerController : MonoBehaviour
 
     void Throw()
     {
+        if (motion != null)
+            motion.Attack();
         Rigidbody thrownObject = heldObject;
         AcornProjectile acornProjectile = thrownObject.GetComponent<AcornProjectile>();
 
@@ -321,6 +339,9 @@ public class PlayerController : MonoBehaviour
         if (acornProjectile != null)
             acornProjectile.Launch(cameraTransform.forward);
         else
+        {
             thrownObject.AddForce(cameraTransform.forward * throwForce, ForceMode.Impulse);
+            GameAudio.PlayThrow();
+        }
     }
 }

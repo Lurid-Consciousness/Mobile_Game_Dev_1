@@ -7,12 +7,16 @@ public class PlayerHUD : MonoBehaviour
     private PlayerController playerController;
     private TreeObjective tree;
     private WaveManager waveManager;
+    private AcornWallet wallet;
+    private PlayerPowerups powerups;
 
     private GUIStyle pickupStyle;
 
     void Awake()
     {
         playerController = GetComponent<PlayerController>();
+        wallet = GetComponent<AcornWallet>();
+        powerups = GetComponent<PlayerPowerups>();
         tree = FindAnyObjectByType<TreeObjective>();
         waveManager = FindAnyObjectByType<WaveManager>();
     }
@@ -24,8 +28,44 @@ public class PlayerHUD : MonoBehaviour
         if (playerController.CanPickup)
             DrawPickupPrompt();
 
+        if (wallet != null)
+            GUI.Label(new Rect(20f, 140f, 280f, 30f), $"Acorn points: {wallet.Acorns}");
+
+        Defence barrier = playerController.TargetDefence;
+        if (barrier != null)
+        {
+            string status = barrier.IsBroken ? "Broken barrier" : $"Barrier: {barrier.WallHealth * 100f:0}%";
+            string action = barrier.NeedsRepair ? $"  {playerController.ButtonPrompt}: rebuild/repair ({barrier.RepairCost} points)" : "";
+            GUI.Label(new Rect(Screen.width / 2f - 220f, Screen.height / 2f + 35f, 550f, 30f), status + action);
+        }
+
         DrawBar(new Vector2(20f, 20f), playerController.HealthPercent, Color.red, "Health");
-        DrawBar(new Vector2(20f, 50f), playerController.StaminaPercent, Color.yellow, "Stamina");
+        if (playerController.boomerang != null)
+        {
+            DrawBar(new Vector2(20f, 50f), playerController.boomerang.ChargeAmount, Color.yellow, "Charge");
+            GUI.Label(new Rect(Screen.width - 300f, 20f, 290f, 30f), $"Curve: {playerController.boomerang.CurveAngle:0} degrees (scroll)");
+        }
+        if (powerups != null)
+        {
+            if (powerups.CanSprint)
+                GUI.Label(new Rect(Screen.width - 300f, 50f, 290f, 30f), $"Sprint: {powerups.SprintRemaining:0.0}s - hold Shift + move");
+            if (powerups.LockRemaining > 0f)
+                GUI.Label(new Rect(Screen.width - 300f, 80f, 290f, 30f), $"Multi-lock: {powerups.LockRemaining:0.0}s  {powerups.Targets.Count}/4");
+            Camera camera = playerController.cameraTransform.GetComponent<Camera>();
+            for (int i = 0; i < powerups.Targets.Count; i++)
+            {
+                Enemy enemy = powerups.Targets[i];
+                if (enemy == null)
+                    continue;
+                Vector3 screen = camera.WorldToScreenPoint(enemy.transform.position + Vector3.up);
+                if (screen.z > 0f)
+                {
+                    GUI.color = Color.cyan;
+                    GUI.Label(new Rect(screen.x - 40f, Screen.height - screen.y - 20f, 100f, 30f), $"[LOCK {i + 1}]");
+                    GUI.color = Color.white;
+                }
+            }
+        }
 
         if (tree != null)
             DrawBar(new Vector2(20f, 80f), tree.HealthPercent, Color.green, "Tree");
